@@ -4,74 +4,26 @@ import {
   dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
   resolveBranchSelectionTarget,
-  resolveDraftEnvModeAfterBranchChange,
   resolveBranchToolbarValue,
 } from "./BranchToolbar.logic";
 
-describe("resolveDraftEnvModeAfterBranchChange", () => {
-  it("switches to local mode when returning from an existing worktree to the main worktree", () => {
-    expect(
-      resolveDraftEnvModeAfterBranchChange({
-        nextWorktreePath: null,
-        currentWorktreePath: "/repo/.t3/worktrees/feature-a",
-        effectiveEnvMode: "worktree",
-      }),
-    ).toBe("local");
-  });
-
-  it("keeps new-worktree mode when selecting a base branch before worktree creation", () => {
-    expect(
-      resolveDraftEnvModeAfterBranchChange({
-        nextWorktreePath: null,
-        currentWorktreePath: null,
-        effectiveEnvMode: "worktree",
-      }),
-    ).toBe("worktree");
-  });
-
-  it("uses worktree mode when selecting a branch already attached to a worktree", () => {
-    expect(
-      resolveDraftEnvModeAfterBranchChange({
-        nextWorktreePath: "/repo/.t3/worktrees/feature-a",
-        currentWorktreePath: null,
-        effectiveEnvMode: "local",
-      }),
-    ).toBe("worktree");
-  });
-});
-
 describe("resolveBranchToolbarValue", () => {
-  it("defaults new-worktree mode to current git branch when no explicit base branch is set", () => {
+  it("uses the current git branch when available", () => {
     expect(
       resolveBranchToolbarValue({
-        envMode: "worktree",
-        activeWorktreePath: null,
         activeThreadBranch: null,
         currentGitBranch: "main",
       }),
     ).toBe("main");
   });
 
-  it("keeps an explicitly selected worktree base branch", () => {
+  it("falls back to the thread branch when git status is unavailable", () => {
     expect(
       resolveBranchToolbarValue({
-        envMode: "worktree",
-        activeWorktreePath: null,
         activeThreadBranch: "feature/base",
-        currentGitBranch: "main",
+        currentGitBranch: null,
       }),
     ).toBe("feature/base");
-  });
-
-  it("shows the actual checked-out branch when not selecting a new worktree base", () => {
-    expect(
-      resolveBranchToolbarValue({
-        envMode: "local",
-        activeWorktreePath: null,
-        activeThreadBranch: "feature/base",
-        currentGitBranch: "main",
-      }),
-    ).toBe("main");
   });
 });
 

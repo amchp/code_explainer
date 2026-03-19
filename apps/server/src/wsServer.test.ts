@@ -50,7 +50,6 @@ import { Open, type OpenShape } from "./open";
 import { GitManager, type GitManagerShape } from "./git/Services/GitManager.ts";
 import type { GitCoreShape } from "./git/Services/GitCore.ts";
 import { GitCore } from "./git/Services/GitCore.ts";
-import { GitCommandError, GitManagerError } from "./git/Errors.ts";
 import { MigrationError } from "@effect/sql-sqlite-bun/SqliteMigrator";
 import { AnalyticsService } from "./telemetry/Services/AnalyticsService.ts";
 
@@ -480,7 +479,7 @@ describe("WebSocket Server", () => {
       providerHealth?: ProviderHealthShape;
       open?: OpenShape;
       gitManager?: GitManagerShape;
-      gitCore?: Pick<GitCoreShape, "listBranches" | "initRepo" | "pullCurrentBranch">;
+      gitCore?: Pick<GitCoreShape, "listBranches">;
       terminalManager?: TerminalManagerShape;
     } = {},
   ): Promise<Http.Server> {
@@ -1104,102 +1103,6 @@ describe("WebSocket Server", () => {
     expect(response.error!.message).toContain("Invalid request format");
   });
 
-  it("returns error when requesting turn diff for unknown thread", async () => {
-    server = await createTestServer({ cwd: "/test" });
-    const addr = server.address();
-    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
-
-    const [ws] = await connectAndAwaitWelcome(port);
-    connections.push(ws);
-
-    const response = await sendRequest(ws, ORCHESTRATION_WS_METHODS.getTurnDiff, {
-      threadId: "thread-missing",
-      fromTurnCount: 1,
-      toTurnCount: 2,
-    });
-    expect(response.result).toBeUndefined();
-    expect(response.error?.message).toContain("Thread 'thread-missing' not found.");
-  });
-
-  it("returns error when requesting turn diff with an inverted range", async () => {
-    server = await createTestServer({ cwd: "/test" });
-    const addr = server.address();
-    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
-
-    const [ws] = await connectAndAwaitWelcome(port);
-    connections.push(ws);
-
-    const response = await sendRequest(ws, ORCHESTRATION_WS_METHODS.getTurnDiff, {
-      threadId: "thread-any",
-      fromTurnCount: 2,
-      toTurnCount: 1,
-    });
-    expect(response.result).toBeUndefined();
-    expect(response.error?.message).toContain(
-      "fromTurnCount must be less than or equal to toTurnCount",
-    );
-  });
-
-  it("returns error when requesting full thread diff for unknown thread", async () => {
-    server = await createTestServer({ cwd: "/test" });
-    const addr = server.address();
-    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
-
-    const [ws] = await connectAndAwaitWelcome(port);
-    connections.push(ws);
-
-    const response = await sendRequest(ws, ORCHESTRATION_WS_METHODS.getFullThreadDiff, {
-      threadId: "thread-missing",
-      toTurnCount: 2,
-    });
-    expect(response.result).toBeUndefined();
-    expect(response.error?.message).toContain("Thread 'thread-missing' not found.");
-  });
-
-  it("returns retryable error when requested turn exceeds current checkpoint turn count", async () => {
-    server = await createTestServer({ cwd: "/test" });
-    const addr = server.address();
-    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
-
-    const [ws] = await connectAndAwaitWelcome(port);
-    connections.push(ws);
-
-    const workspaceRoot = makeTempDir("t3code-ws-diff-project-");
-    const createdAt = new Date().toISOString();
-    const createProjectResponse = await sendRequest(ws, ORCHESTRATION_WS_METHODS.dispatchCommand, {
-      type: "project.create",
-      commandId: "cmd-diff-project-create",
-      projectId: "project-diff",
-      title: "Diff Project",
-      workspaceRoot,
-      defaultModel: "gpt-5-codex",
-      createdAt,
-    });
-    expect(createProjectResponse.error).toBeUndefined();
-    const createThreadResponse = await sendRequest(ws, ORCHESTRATION_WS_METHODS.dispatchCommand, {
-      type: "thread.create",
-      commandId: "cmd-diff-thread-create",
-      threadId: "thread-diff",
-      projectId: "project-diff",
-      title: "Diff Thread",
-      model: "gpt-5-codex",
-      runtimeMode: "full-access",
-      interactionMode: "default",
-      branch: null,
-      worktreePath: null,
-      createdAt,
-    });
-    expect(createThreadResponse.error).toBeUndefined();
-
-    const response = await sendRequest(ws, ORCHESTRATION_WS_METHODS.getTurnDiff, {
-      threadId: "thread-diff",
-      fromTurnCount: 0,
-      toTurnCount: 1,
-    });
-    expect(response.result).toBeUndefined();
-    expect(response.error?.message).toContain("exceeds current turn count");
-  });
-
   it("keeps orchestration domain push behavior for provider runtime events", async () => {
     const runtimeEventPubSub = Effect.runSync(PubSub.unbounded<ProviderRuntimeEvent>());
     const emitRuntimeEvent = (event: ProviderRuntimeEvent) => {
@@ -1629,24 +1532,11 @@ describe("WebSocket Server", () => {
         hasOriginRemote: false,
       }),
     );
-    const initRepo = vi.fn(() => Effect.void);
-    const pullCurrentBranch = vi.fn(() =>
-      Effect.fail(
-        new GitCommandError({
-          operation: "GitCore.test.pullCurrentBranch",
-          detail: "No upstream configured",
-          command: "git pull",
-          cwd: "/repo/path",
-        }),
-      ),
-    );
 
     server = await createTestServer({
       cwd: "/test",
       gitCore: {
         listBranches,
-        initRepo,
-        pullCurrentBranch,
       },
     });
     const addr = server.address();
@@ -1659,15 +1549,6 @@ describe("WebSocket Server", () => {
     expect(listResponse.error).toBeUndefined();
     expect(listResponse.result).toEqual({ branches: [], isRepo: false, hasOriginRemote: false });
     expect(listBranches).toHaveBeenCalledWith({ cwd: "/repo/path" });
-
-    const initResponse = await sendRequest(ws, WS_METHODS.gitInit, { cwd: "/repo/path" });
-    expect(initResponse.error).toBeUndefined();
-    expect(initRepo).toHaveBeenCalledWith({ cwd: "/repo/path" });
-
-    const pullResponse = await sendRequest(ws, WS_METHODS.gitPull, { cwd: "/repo/path" });
-    expect(pullResponse.result).toBeUndefined();
-    expect(pullResponse.error?.message).toContain("No upstream configured");
-    expect(pullCurrentBranch).toHaveBeenCalledWith("/repo/path");
   });
 
   it("supports git.status over websocket", async () => {
@@ -1764,41 +1645,6 @@ describe("WebSocket Server", () => {
       cwd: "/test",
       reference: "42",
       mode: "worktree",
-    });
-  });
-
-  it("returns errors from git.runStackedAction", async () => {
-    const runStackedAction = vi.fn(() =>
-      Effect.fail(
-        new GitManagerError({
-          operation: "GitManager.test.runStackedAction",
-          detail: "Cannot push from detached HEAD.",
-        }),
-      ),
-    );
-    const gitManager: GitManagerShape = {
-      status: vi.fn(() => Effect.void as any),
-      resolvePullRequest: vi.fn(() => Effect.void as any),
-      preparePullRequestThread: vi.fn(() => Effect.void as any),
-      runStackedAction,
-    };
-
-    server = await createTestServer({ cwd: "/test", gitManager });
-    const addr = server.address();
-    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
-
-    const [ws] = await connectAndAwaitWelcome(port);
-    connections.push(ws);
-
-    const response = await sendRequest(ws, WS_METHODS.gitRunStackedAction, {
-      cwd: "/test",
-      action: "commit_push",
-    });
-    expect(response.result).toBeUndefined();
-    expect(response.error?.message).toContain("detached HEAD");
-    expect(runStackedAction).toHaveBeenCalledWith({
-      cwd: "/test",
-      action: "commit_push",
     });
   });
 

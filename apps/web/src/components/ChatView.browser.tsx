@@ -931,7 +931,6 @@ describe("ChatView timeline estimator parity (full app)", () => {
           interactionMode: "default",
           branch: null,
           worktreePath: null,
-          envMode: "local",
         },
       },
       projectDraftThreadIdByProjectId: {

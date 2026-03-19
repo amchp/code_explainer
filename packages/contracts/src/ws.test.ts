@@ -7,31 +7,25 @@ import { WebSocketRequest, WsResponse, WS_CHANNELS, WS_METHODS } from "./ws";
 const decodeWebSocketRequest = Schema.decodeUnknownEffect(WebSocketRequest);
 const decodeWsResponse = Schema.decodeUnknownEffect(WsResponse);
 
-it.effect("accepts getTurnDiff requests when fromTurnCount <= toTurnCount", () =>
+it.effect("accepts getSnapshot requests", () =>
   Effect.gen(function* () {
     const parsed = yield* decodeWebSocketRequest({
       id: "req-1",
       body: {
-        _tag: ORCHESTRATION_WS_METHODS.getTurnDiff,
-        threadId: "thread-1",
-        fromTurnCount: 1,
-        toTurnCount: 2,
+        _tag: ORCHESTRATION_WS_METHODS.getSnapshot,
       },
     });
-    assert.strictEqual(parsed.body._tag, ORCHESTRATION_WS_METHODS.getTurnDiff);
+    assert.strictEqual(parsed.body._tag, ORCHESTRATION_WS_METHODS.getSnapshot);
   }),
 );
 
-it.effect("rejects getTurnDiff requests when fromTurnCount > toTurnCount", () =>
+it.effect("rejects unknown orchestration request tags", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
       decodeWebSocketRequest({
         id: "req-1",
         body: {
-          _tag: ORCHESTRATION_WS_METHODS.getTurnDiff,
-          threadId: "thread-1",
-          fromTurnCount: 3,
-          toTurnCount: 2,
+          _tag: "orchestration.getTurnDiff",
         },
       }),
     );
@@ -44,17 +38,11 @@ it.effect("trims websocket request id and nested orchestration ids", () =>
     const parsed = yield* decodeWebSocketRequest({
       id: " req-1 ",
       body: {
-        _tag: ORCHESTRATION_WS_METHODS.getTurnDiff,
-        threadId: " thread-1 ",
-        fromTurnCount: 0,
-        toTurnCount: 0,
+        _tag: ORCHESTRATION_WS_METHODS.getSnapshot,
       },
     });
     assert.strictEqual(parsed.id, "req-1");
-    assert.strictEqual(parsed.body._tag, ORCHESTRATION_WS_METHODS.getTurnDiff);
-    if (parsed.body._tag === ORCHESTRATION_WS_METHODS.getTurnDiff) {
-      assert.strictEqual(parsed.body.threadId, "thread-1");
-    }
+    assert.strictEqual(parsed.body._tag, ORCHESTRATION_WS_METHODS.getSnapshot);
   }),
 );
 

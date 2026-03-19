@@ -25,7 +25,6 @@ import { parsePullRequestReference } from "../pullRequestReference";
 import {
   dedupeRemoteBranchesWithLocalMatches,
   deriveLocalBranchNameFromRemoteRef,
-  EnvMode,
   resolveBranchSelectionTarget,
   resolveBranchToolbarValue,
 } from "./BranchToolbar.logic";
@@ -46,8 +45,6 @@ interface BranchToolbarBranchSelectorProps {
   activeThreadBranch: string | null;
   activeWorktreePath: string | null;
   branchCwd: string | null;
-  effectiveEnvMode: EnvMode;
-  envLocked: boolean;
   onSetThreadBranch: (branch: string | null, worktreePath: string | null) => void;
   onCheckoutPullRequestRequest?: (reference: string) => void;
   onComposerFocusRequest?: () => void;
@@ -57,17 +54,10 @@ function toBranchActionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "An error occurred.";
 }
 
-function getBranchTriggerLabel(input: {
-  activeWorktreePath: string | null;
-  effectiveEnvMode: EnvMode;
-  resolvedActiveBranch: string | null;
-}): string {
-  const { activeWorktreePath, effectiveEnvMode, resolvedActiveBranch } = input;
+function getBranchTriggerLabel(input: { resolvedActiveBranch: string | null }): string {
+  const { resolvedActiveBranch } = input;
   if (!resolvedActiveBranch) {
     return "Select branch";
-  }
-  if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
-    return `From ${resolvedActiveBranch}`;
   }
   return resolvedActiveBranch;
 }
@@ -77,8 +67,6 @@ export function BranchToolbarBranchSelector({
   activeThreadBranch,
   activeWorktreePath,
   branchCwd,
-  effectiveEnvMode,
-  envLocked,
   onSetThreadBranch,
   onCheckoutPullRequestRequest,
   onComposerFocusRequest,
@@ -97,8 +85,6 @@ export function BranchToolbarBranchSelector({
   const currentGitBranch =
     branchStatusQuery.data?.branch ?? branches.find((branch) => branch.current)?.name ?? null;
   const canonicalActiveBranch = resolveBranchToolbarValue({
-    envMode: effectiveEnvMode,
-    activeWorktreePath,
     activeThreadBranch,
     currentGitBranch,
   });
@@ -111,11 +97,9 @@ export function BranchToolbarBranchSelector({
   const deferredTrimmedBranchQuery = deferredBranchQuery.trim();
   const normalizedDeferredBranchQuery = deferredTrimmedBranchQuery.toLowerCase();
   const prReference = parsePullRequestReference(trimmedBranchQuery);
-  const isSelectingWorktreeBase =
-    effectiveEnvMode === "worktree" && !envLocked && !activeWorktreePath;
   const checkoutPullRequestItemValue =
     prReference && onCheckoutPullRequestRequest ? `__checkout_pull_request__:${prReference}` : null;
-  const canCreateBranch = !isSelectingWorktreeBase && trimmedBranchQuery.length > 0;
+  const canCreateBranch = trimmedBranchQuery.length > 0;
   const hasExactBranchMatch = branchByName.has(trimmedBranchQuery);
   const createBranchItemValue = canCreateBranch
     ? `__create_new_branch__:${trimmedBranchQuery}`
@@ -157,14 +141,6 @@ export function BranchToolbarBranchSelector({
   const selectBranch = (branch: GitBranch) => {
     const api = readNativeApi();
     if (!api || !branchCwd || isBranchActionPending) return;
-
-    // In new-worktree mode, selecting a branch sets the base branch.
-    if (isSelectingWorktreeBase) {
-      onSetThreadBranch(branch.name, null);
-      setIsBranchMenuOpen(false);
-      onComposerFocusRequest?.();
-      return;
-    }
 
     const selectionTarget = resolveBranchSelectionTarget({
       activeProjectCwd,
@@ -252,24 +228,6 @@ export function BranchToolbarBranchSelector({
     });
   };
 
-  useEffect(() => {
-    if (
-      effectiveEnvMode !== "worktree" ||
-      activeWorktreePath ||
-      activeThreadBranch ||
-      !currentGitBranch
-    ) {
-      return;
-    }
-    onSetThreadBranch(currentGitBranch, null);
-  }, [
-    activeThreadBranch,
-    activeWorktreePath,
-    currentGitBranch,
-    effectiveEnvMode,
-    onSetThreadBranch,
-  ]);
-
   const handleOpenChange = useCallback(
     (open: boolean) => {
       setIsBranchMenuOpen(open);
@@ -322,8 +280,6 @@ export function BranchToolbarBranchSelector({
   ]);
 
   const triggerLabel = getBranchTriggerLabel({
-    activeWorktreePath,
-    effectiveEnvMode,
     resolvedActiveBranch,
   });
 

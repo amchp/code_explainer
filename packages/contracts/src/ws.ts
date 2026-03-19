@@ -5,10 +5,8 @@ import {
   ClientOrchestrationCommand,
   OrchestrationEvent,
   ORCHESTRATION_WS_CHANNELS,
-  OrchestrationGetFullThreadDiffInput,
   ORCHESTRATION_WS_METHODS,
   OrchestrationGetSnapshotInput,
-  OrchestrationGetTurnDiffInput,
   OrchestrationReplayEventsInput,
 } from "./orchestration";
 import {
@@ -16,12 +14,9 @@ import {
   GitCreateBranchInput,
   GitPreparePullRequestThreadInput,
   GitCreateWorktreeInput,
-  GitInitInput,
   GitListBranchesInput,
-  GitPullInput,
   GitPullRequestRefInput,
   GitRemoveWorktreeInput,
-  GitRunStackedActionInput,
   GitStatusInput,
 } from "./git";
 import {
@@ -52,15 +47,12 @@ export const WS_METHODS = {
   shellOpenInEditor: "shell.openInEditor",
 
   // Git methods
-  gitPull: "git.pull",
   gitStatus: "git.status",
-  gitRunStackedAction: "git.runStackedAction",
   gitListBranches: "git.listBranches",
   gitCreateWorktree: "git.createWorktree",
   gitRemoveWorktree: "git.removeWorktree",
   gitCreateBranch: "git.createBranch",
   gitCheckout: "git.checkout",
-  gitInit: "git.init",
   gitResolvePullRequest: "git.resolvePullRequest",
   gitPreparePullRequestThread: "git.preparePullRequestThread",
 
@@ -104,8 +96,6 @@ const WebSocketRequestBody = Schema.Union([
     Schema.Struct({ command: ClientOrchestrationCommand }),
   ),
   tagRequestBody(ORCHESTRATION_WS_METHODS.getSnapshot, OrchestrationGetSnapshotInput),
-  tagRequestBody(ORCHESTRATION_WS_METHODS.getTurnDiff, OrchestrationGetTurnDiffInput),
-  tagRequestBody(ORCHESTRATION_WS_METHODS.getFullThreadDiff, OrchestrationGetFullThreadDiffInput),
   tagRequestBody(ORCHESTRATION_WS_METHODS.replayEvents, OrchestrationReplayEventsInput),
 
   // Project Search
@@ -116,15 +106,12 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.shellOpenInEditor, OpenInEditorInput),
 
   // Git methods
-  tagRequestBody(WS_METHODS.gitPull, GitPullInput),
   tagRequestBody(WS_METHODS.gitStatus, GitStatusInput),
-  tagRequestBody(WS_METHODS.gitRunStackedAction, GitRunStackedActionInput),
   tagRequestBody(WS_METHODS.gitListBranches, GitListBranchesInput),
   tagRequestBody(WS_METHODS.gitCreateWorktree, GitCreateWorktreeInput),
   tagRequestBody(WS_METHODS.gitRemoveWorktree, GitRemoveWorktreeInput),
   tagRequestBody(WS_METHODS.gitCreateBranch, GitCreateBranchInput),
   tagRequestBody(WS_METHODS.gitCheckout, GitCheckoutInput),
-  tagRequestBody(WS_METHODS.gitInit, GitInitInput),
   tagRequestBody(WS_METHODS.gitResolvePullRequest, GitPullRequestRefInput),
   tagRequestBody(WS_METHODS.gitPreparePullRequestThread, GitPreparePullRequestThreadInput),
 

@@ -11,8 +11,6 @@ import { resolveShortcutCommand } from "../keybindings";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { Sidebar, SidebarProvider } from "~/components/ui/sidebar";
-import { resolveSidebarNewThreadEnvMode } from "~/components/Sidebar.logic";
-import { useAppSettings } from "~/appSettings";
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
 
@@ -28,7 +26,6 @@ function ChatRouteGlobalShortcuts() {
       ? selectThreadTerminalState(state.terminalStateByThreadId, routeThreadId).terminalOpen
       : false,
   );
-  const { settings: appSettings } = useAppSettings();
 
   useEffect(() => {
     const onWindowKeyDown = (event: KeyboardEvent) => {
@@ -50,24 +47,12 @@ function ChatRouteGlobalShortcuts() {
         },
       });
 
-      if (command === "chat.newLocal") {
-        event.preventDefault();
-        event.stopPropagation();
-        void handleNewThread(projectId, {
-          envMode: resolveSidebarNewThreadEnvMode({
-            defaultEnvMode: appSettings.defaultThreadEnvMode,
-          }),
-        });
-        return;
-      }
-
       if (command !== "chat.new") return;
       event.preventDefault();
       event.stopPropagation();
       void handleNewThread(projectId, {
         branch: activeThread?.branch ?? activeDraftThread?.branch ?? null,
         worktreePath: activeThread?.worktreePath ?? activeDraftThread?.worktreePath ?? null,
-        envMode: activeDraftThread?.envMode ?? (activeThread?.worktreePath ? "worktree" : "local"),
       });
     };
 
@@ -84,7 +69,6 @@ function ChatRouteGlobalShortcuts() {
     projects,
     selectedThreadIdsSize,
     terminalOpen,
-    appSettings.defaultThreadEnvMode,
   ]);
 
   return null;

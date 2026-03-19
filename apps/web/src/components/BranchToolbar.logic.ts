@@ -1,43 +1,10 @@
 import type { GitBranch } from "@t3tools/contracts";
 
-export type EnvMode = "local" | "worktree";
-
-export function resolveEffectiveEnvMode(input: {
-  activeWorktreePath: string | null;
-  hasServerThread: boolean;
-  draftThreadEnvMode: EnvMode | undefined;
-}): EnvMode {
-  const { activeWorktreePath, hasServerThread, draftThreadEnvMode } = input;
-  return activeWorktreePath || (!hasServerThread && draftThreadEnvMode === "worktree")
-    ? "worktree"
-    : "local";
-}
-
-export function resolveDraftEnvModeAfterBranchChange(input: {
-  nextWorktreePath: string | null;
-  currentWorktreePath: string | null;
-  effectiveEnvMode: EnvMode;
-}): EnvMode {
-  const { nextWorktreePath, currentWorktreePath, effectiveEnvMode } = input;
-  if (nextWorktreePath) {
-    return "worktree";
-  }
-  if (effectiveEnvMode === "worktree" && !currentWorktreePath) {
-    return "worktree";
-  }
-  return "local";
-}
-
 export function resolveBranchToolbarValue(input: {
-  envMode: EnvMode;
-  activeWorktreePath: string | null;
   activeThreadBranch: string | null;
   currentGitBranch: string | null;
 }): string | null {
-  const { envMode, activeWorktreePath, activeThreadBranch, currentGitBranch } = input;
-  if (envMode === "worktree" && !activeWorktreePath) {
-    return activeThreadBranch ?? currentGitBranch;
-  }
+  const { activeThreadBranch, currentGitBranch } = input;
   return currentGitBranch ?? activeThreadBranch;
 }
 

@@ -55,7 +55,6 @@ import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnap
 import { OrchestrationReactor } from "./orchestration/Services/OrchestrationReactor";
 import { ProviderService } from "./provider/Services/ProviderService";
 import { ProviderHealth } from "./provider/Services/ProviderHealth";
-import { CheckpointDiffQuery } from "./checkpointing/Services/CheckpointDiffQuery";
 import { clamp } from "effect/Number";
 import { Open, resolveAvailableEditors } from "./open";
 import { ServerConfig } from "./config";
@@ -205,7 +204,6 @@ const decodeWebSocketRequest = decodeJsonResult(WebSocketRequest);
 export type ServerCoreRuntimeServices =
   | OrchestrationEngineService
   | ProjectionSnapshotQuery
-  | CheckpointDiffQuery
   | OrchestrationReactor
   | ProviderService
   | ProviderHealth;
@@ -600,7 +598,6 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
 
   const orchestrationEngine = yield* OrchestrationEngineService;
   const projectionReadModelQuery = yield* ProjectionSnapshotQuery;
-  const checkpointDiffQuery = yield* CheckpointDiffQuery;
   const orchestrationReactor = yield* OrchestrationReactor;
   const { openInEditor } = yield* Open;
 
@@ -715,16 +712,6 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return yield* orchestrationEngine.dispatch(normalizedCommand);
       }
 
-      case ORCHESTRATION_WS_METHODS.getTurnDiff: {
-        const body = stripRequestTag(request.body);
-        return yield* checkpointDiffQuery.getTurnDiff(body);
-      }
-
-      case ORCHESTRATION_WS_METHODS.getFullThreadDiff: {
-        const body = stripRequestTag(request.body);
-        return yield* checkpointDiffQuery.getFullThreadDiff(body);
-      }
-
       case ORCHESTRATION_WS_METHODS.replayEvents: {
         const { fromSequenceExclusive } = request.body;
         return yield* Stream.runCollect(
@@ -786,16 +773,6 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return yield* gitManager.status(body);
       }
 
-      case WS_METHODS.gitPull: {
-        const body = stripRequestTag(request.body);
-        return yield* git.pullCurrentBranch(body.cwd);
-      }
-
-      case WS_METHODS.gitRunStackedAction: {
-        const body = stripRequestTag(request.body);
-        return yield* gitManager.runStackedAction(body);
-      }
-
       case WS_METHODS.gitResolvePullRequest: {
         const body = stripRequestTag(request.body);
         return yield* gitManager.resolvePullRequest(body);
@@ -829,11 +806,6 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
       case WS_METHODS.gitCheckout: {
         const body = stripRequestTag(request.body);
         return yield* Effect.scoped(git.checkoutBranch(body));
-      }
-
-      case WS_METHODS.gitInit: {
-        const body = stripRequestTag(request.body);
-        return yield* git.initRepo(body);
       }
 
       case WS_METHODS.terminalOpen: {

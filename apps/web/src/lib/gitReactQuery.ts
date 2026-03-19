@@ -1,4 +1,3 @@
-import type { GitStackedAction } from "@t3tools/contracts";
 import { mutationOptions, queryOptions, type QueryClient } from "@tanstack/react-query";
 import { ensureNativeApi } from "../nativeApi";
 
@@ -14,10 +13,7 @@ export const gitQueryKeys = {
 };
 
 export const gitMutationKeys = {
-  init: (cwd: string | null) => ["git", "mutation", "init", cwd] as const,
   checkout: (cwd: string | null) => ["git", "mutation", "checkout", cwd] as const,
-  runStackedAction: (cwd: string | null) => ["git", "mutation", "run-stacked-action", cwd] as const,
-  pull: (cwd: string | null) => ["git", "mutation", "pull", cwd] as const,
   preparePullRequestThread: (cwd: string | null) =>
     ["git", "mutation", "prepare-pull-request-thread", cwd] as const,
 };
@@ -78,20 +74,6 @@ export function gitResolvePullRequestQueryOptions(input: {
   });
 }
 
-export function gitInitMutationOptions(input: { cwd: string | null; queryClient: QueryClient }) {
-  return mutationOptions({
-    mutationKey: gitMutationKeys.init(input.cwd),
-    mutationFn: async () => {
-      const api = ensureNativeApi();
-      if (!input.cwd) throw new Error("Git init is unavailable.");
-      return api.git.init({ cwd: input.cwd });
-    },
-    onSuccess: async () => {
-      await invalidateGitQueries(input.queryClient);
-    },
-  });
-}
-
 export function gitCheckoutMutationOptions(input: {
   cwd: string | null;
   queryClient: QueryClient;
@@ -104,55 +86,6 @@ export function gitCheckoutMutationOptions(input: {
       return api.git.checkout({ cwd: input.cwd, branch });
     },
     onSuccess: async () => {
-      await invalidateGitQueries(input.queryClient);
-    },
-  });
-}
-
-export function gitRunStackedActionMutationOptions(input: {
-  cwd: string | null;
-  queryClient: QueryClient;
-  model?: string | null;
-}) {
-  return mutationOptions({
-    mutationKey: gitMutationKeys.runStackedAction(input.cwd),
-    mutationFn: async ({
-      action,
-      commitMessage,
-      featureBranch,
-      filePaths,
-    }: {
-      action: GitStackedAction;
-      commitMessage?: string;
-      featureBranch?: boolean;
-      filePaths?: string[];
-    }) => {
-      const api = ensureNativeApi();
-      if (!input.cwd) throw new Error("Git action is unavailable.");
-      return api.git.runStackedAction({
-        cwd: input.cwd,
-        action,
-        ...(commitMessage ? { commitMessage } : {}),
-        ...(featureBranch ? { featureBranch } : {}),
-        ...(filePaths ? { filePaths } : {}),
-        ...(input.model ? { model: input.model } : {}),
-      });
-    },
-    onSettled: async () => {
-      await invalidateGitQueries(input.queryClient);
-    },
-  });
-}
-
-export function gitPullMutationOptions(input: { cwd: string | null; queryClient: QueryClient }) {
-  return mutationOptions({
-    mutationKey: gitMutationKeys.pull(input.cwd),
-    mutationFn: async () => {
-      const api = ensureNativeApi();
-      if (!input.cwd) throw new Error("Git pull is unavailable.");
-      return api.git.pull({ cwd: input.cwd });
-    },
-    onSettled: async () => {
       await invalidateGitQueries(input.queryClient);
     },
   });

@@ -21,7 +21,6 @@ import { useStore } from "../store";
 import { useTerminalStateStore } from "../terminalStateStore";
 import { terminalRunningSubprocessFromEvent } from "../terminalActivity";
 import { onServerConfigUpdated, onServerWelcome } from "../wsNativeApi";
-import { providerQueryKeys } from "../lib/providerReactQuery";
 import { projectQueryKeys } from "../lib/projectReactQuery";
 import { collectActiveTerminalThreadIds } from "../lib/terminalStateCleanup";
 
@@ -151,7 +150,7 @@ function EventRouter() {
     let latestSequence = 0;
     let syncing = false;
     let pending = false;
-    let needsProviderInvalidation = false;
+    let needsProjectInvalidation = false;
 
     const flushSnapshotSync = async (): Promise<void> => {
       const snapshot = await api.orchestration.getSnapshot();
@@ -190,11 +189,8 @@ function EventRouter() {
 
     const domainEventFlushThrottler = new Throttler(
       () => {
-        if (needsProviderInvalidation) {
-          needsProviderInvalidation = false;
-          void queryClient.invalidateQueries({ queryKey: providerQueryKeys.all });
-          // Invalidate workspace entry queries so the @-mention file picker
-          // reflects files created, deleted, or restored during this turn.
+        if (needsProjectInvalidation) {
+          needsProjectInvalidation = false;
           void queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
         }
         void syncSnapshot();
@@ -212,7 +208,7 @@ function EventRouter() {
       }
       latestSequence = event.sequence;
       if (event.type === "thread.turn-diff-completed" || event.type === "thread.reverted") {
-        needsProviderInvalidation = true;
+        needsProjectInvalidation = true;
       }
       domainEventFlushThrottler.maybeExecute();
     });
@@ -303,7 +299,7 @@ function EventRouter() {
     subscribed = true;
     return () => {
       disposed = true;
-      needsProviderInvalidation = false;
+      needsProjectInvalidation = false;
       domainEventFlushThrottler.cancel();
       unsubDomainEvent();
       unsubTerminalEvent();
