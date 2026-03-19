@@ -449,6 +449,7 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
             ? createdAt
             : new Date().toISOString(),
         runtimeMode:
+          candidateDraftThread.runtimeMode === "read-only" ||
           candidateDraftThread.runtimeMode === "approval-required" ||
           candidateDraftThread.runtimeMode === "full-access"
             ? candidateDraftThread.runtimeMode
@@ -528,6 +529,7 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
         ? normalizeModelSlug(draftCandidate.model, provider ?? "codex")
         : null;
     const runtimeMode =
+      draftCandidate.runtimeMode === "read-only" ||
       draftCandidate.runtimeMode === "approval-required" ||
       draftCandidate.runtimeMode === "full-access"
         ? draftCandidate.runtimeMode
@@ -1022,7 +1024,7 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
           return;
         }
         const nextRuntimeMode =
-          runtimeMode === "approval-required" || runtimeMode === "full-access" ? runtimeMode : null;
+          runtimeMode === "read-only" || runtimeMode === "approval-required" || runtimeMode === "full-access" ? runtimeMode : null;
         set((state) => {
           const existing = state.draftsByThreadId[threadId];
           if (!existing && nextRuntimeMode === null) {

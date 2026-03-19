@@ -58,6 +58,7 @@ import { ProviderHealth } from "./provider/Services/ProviderHealth";
 import { clamp } from "effect/Number";
 import { Open, resolveAvailableEditors } from "./open";
 import { ServerConfig } from "./config";
+import { isDrawioMcpEnabled, setDrawioMcpEnabled } from "./codexMcpConfig";
 import { GitCore } from "./git/Services/GitCore.ts";
 import { tryHandleProjectFaviconRequest } from "./projectFaviconRoute";
 import {
@@ -853,6 +854,12 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         const body = stripRequestTag(request.body);
         const keybindingsConfig = yield* keybindingsManager.upsertKeybindingRule(body);
         return { keybindings: keybindingsConfig, issues: [] };
+      }
+
+      case WS_METHODS.serverSetDrawioMcpEnabled: {
+        const body = stripRequestTag(request.body);
+        const enabled = setDrawioMcpEnabled(body.enabled);
+        return { enabled };
       }
 
       default: {

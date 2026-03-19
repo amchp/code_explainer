@@ -12,6 +12,7 @@ import {
   CodexAppServerManager,
   classifyCodexStderrLine,
   isRecoverableThreadResumeError,
+  mapCodexRuntimeMode,
   normalizeCodexModelSlug,
   readCodexAccountSnapshot,
   resolveCodexModelForAccount,
@@ -827,4 +828,27 @@ describe.skipIf(!process.env.CODEX_BINARY_PATH)("startSession live Codex resume"
       rmSync(workspaceDir, { recursive: true, force: true });
     }
   }, 180_000);
+});
+
+describe("mapCodexRuntimeMode", () => {
+  it("maps read-only to on-request approval and read-only sandbox", () => {
+    expect(mapCodexRuntimeMode("read-only")).toEqual({
+      approvalPolicy: "on-request",
+      sandbox: "read-only",
+    });
+  });
+
+  it("maps approval-required to on-request approval and workspace-write sandbox", () => {
+    expect(mapCodexRuntimeMode("approval-required")).toEqual({
+      approvalPolicy: "on-request",
+      sandbox: "workspace-write",
+    });
+  });
+
+  it("maps full-access to never approval and danger-full-access sandbox", () => {
+    expect(mapCodexRuntimeMode("full-access")).toEqual({
+      approvalPolicy: "never",
+      sandbox: "danger-full-access",
+    });
+  });
 });

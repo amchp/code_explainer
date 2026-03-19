@@ -32,6 +32,7 @@ const AppSettingsSchema = Schema.Struct({
     Schema.withConstructorDefault(() => Option.some([])),
   ),
   textGenerationModel: Schema.optional(TrimmedNonEmptyString),
+  drawioMcpEnabled: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
 });
 export type AppSettings = typeof AppSettingsSchema.Type;
 export interface AppModelOption {

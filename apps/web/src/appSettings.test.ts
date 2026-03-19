@@ -65,3 +65,21 @@ describe("timestamp format defaults", () => {
     expect(DEFAULT_TIMESTAMP_FORMAT).toBe("locale");
   });
 });
+
+describe("drawioMcpEnabled", () => {
+  it("is included in AppSettings type as a boolean field", () => {
+    // Verify the type exists at runtime by confirming the settings type
+    // accepts drawioMcpEnabled. The default (false) is applied via
+    // Schema.withConstructorDefault in the schema definition.
+    const settings: import("./appSettings").AppSettings = {
+      codexBinaryPath: "",
+      codexHomePath: "",
+      confirmThreadDelete: true,
+      enableAssistantStreaming: false,
+      timestampFormat: "locale",
+      customCodexModels: [],
+      drawioMcpEnabled: false,
+    };
+    expect(settings.drawioMcpEnabled).toBe(false);
+  });
+});

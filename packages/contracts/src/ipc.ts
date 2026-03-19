@@ -30,7 +30,12 @@ import type {
   TerminalSessionSnapshot,
   TerminalWriteInput,
 } from "./terminal";
-import type { ServerUpsertKeybindingInput, ServerUpsertKeybindingResult } from "./server";
+import type {
+  ServerSetDrawioMcpEnabledInput,
+  ServerSetDrawioMcpEnabledResult,
+  ServerUpsertKeybindingInput,
+  ServerUpsertKeybindingResult,
+} from "./server";
 import type {
   ClientOrchestrationCommand,
   OrchestrationEvent,
@@ -146,6 +151,9 @@ export interface NativeApi {
   server: {
     getConfig: () => Promise<ServerConfig>;
     upsertKeybinding: (input: ServerUpsertKeybindingInput) => Promise<ServerUpsertKeybindingResult>;
+    setDrawioMcpEnabled: (
+      input: ServerSetDrawioMcpEnabledInput,
+    ) => Promise<ServerSetDrawioMcpEnabledResult>;
   };
   orchestration: {
     getSnapshot: () => Promise<OrchestrationReadModel>;

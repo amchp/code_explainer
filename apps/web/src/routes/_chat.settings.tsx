@@ -695,6 +695,58 @@ function SettingsRouteView() {
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">Integrations</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enable optional tool integrations for chat sessions.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Draw.io diagrams</p>
+                  <p className="text-xs text-muted-foreground">
+                    Allow the assistant to create and edit draw.io diagrams via MCP. The server is
+                    installed automatically when enabled.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.drawioMcpEnabled}
+                  onCheckedChange={(checked) => {
+                    const enabled = Boolean(checked);
+                    updateSettings({ drawioMcpEnabled: enabled });
+                    const api = ensureNativeApi();
+                    void api.server
+                      .setDrawioMcpEnabled({ enabled })
+                      .catch(() => {
+                        // Revert on failure
+                        updateSettings({ drawioMcpEnabled: !enabled });
+                      });
+                  }}
+                  aria-label="Enable draw.io MCP integration"
+                />
+              </div>
+
+              {settings.drawioMcpEnabled !== defaults.drawioMcpEnabled ? (
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => {
+                      updateSettings({ drawioMcpEnabled: defaults.drawioMcpEnabled });
+                      const api = ensureNativeApi();
+                      void api.server.setDrawioMcpEnabled({
+                        enabled: defaults.drawioMcpEnabled,
+                      });
+                    }}
+                  >
+                    Restore default
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
                 <h2 className="text-sm font-medium text-foreground">About</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Application version and environment information.

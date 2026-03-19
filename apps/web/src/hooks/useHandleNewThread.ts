@@ -1,9 +1,10 @@
-import { DEFAULT_RUNTIME_MODE, type ProjectId, ThreadId } from "@t3tools/contracts";
+import { type ProjectId, ThreadId } from "@t3tools/contracts";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { type DraftThreadState, useComposerDraftStore } from "../composerDraftStore";
 import { newThreadId } from "../lib/utils";
 import { useStore } from "../store";
+import { DEFAULT_RUNTIME_MODE } from "../types";
 
 export function useHandleNewThread() {
   const projects = useStore((store) => store.projects);

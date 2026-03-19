@@ -64,6 +64,16 @@ export const ServerUpsertKeybindingResult = Schema.Struct({
 });
 export type ServerUpsertKeybindingResult = typeof ServerUpsertKeybindingResult.Type;
 
+export const ServerSetDrawioMcpEnabledInput = Schema.Struct({
+  enabled: Schema.Boolean,
+});
+export type ServerSetDrawioMcpEnabledInput = typeof ServerSetDrawioMcpEnabledInput.Type;
+
+export const ServerSetDrawioMcpEnabledResult = Schema.Struct({
+  enabled: Schema.Boolean,
+});
+export type ServerSetDrawioMcpEnabledResult = typeof ServerSetDrawioMcpEnabledResult.Type;
+
 export const ServerConfigUpdatedPayload = Schema.Struct({
   issues: ServerConfigIssues,
   providers: ServerProviderStatuses,

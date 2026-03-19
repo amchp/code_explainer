@@ -292,3 +292,22 @@ it.effect("preserves proposed plan implementation metadata when present", () =>
     assert.strictEqual(parsed.implementationThreadId, "thread-2");
   }),
 );
+
+it.effect("accepts read-only runtimeMode explicitly in thread.turn.start", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decodeThreadTurnStartCommand({
+      type: "thread.turn.start",
+      commandId: "cmd-turn-read-only",
+      threadId: "thread-1",
+      message: {
+        messageId: "msg-read-only",
+        role: "user",
+        text: "explain this code",
+        attachments: [],
+      },
+      runtimeMode: "read-only",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    assert.strictEqual(parsed.runtimeMode, "read-only");
+  }),
+);
