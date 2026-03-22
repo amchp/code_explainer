@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { IsoDateTime, TrimmedNonEmptyString } from "./baseSchemas";
+import { DiagramToolIntegrationId } from "./diagram";
 import { KeybindingRule, ResolvedKeybindingsConfig } from "./keybindings";
 import { EditorId } from "./editor";
 import { ProviderKind } from "./orchestration";
@@ -64,15 +65,17 @@ export const ServerUpsertKeybindingResult = Schema.Struct({
 });
 export type ServerUpsertKeybindingResult = typeof ServerUpsertKeybindingResult.Type;
 
-export const ServerSetDrawioMcpEnabledInput = Schema.Struct({
+export const ServerSetDiagramToolMcpEnabledInput = Schema.Struct({
+  integration: DiagramToolIntegrationId,
   enabled: Schema.Boolean,
 });
-export type ServerSetDrawioMcpEnabledInput = typeof ServerSetDrawioMcpEnabledInput.Type;
+export type ServerSetDiagramToolMcpEnabledInput = typeof ServerSetDiagramToolMcpEnabledInput.Type;
 
-export const ServerSetDrawioMcpEnabledResult = Schema.Struct({
+export const ServerSetDiagramToolMcpEnabledResult = Schema.Struct({
+  integration: DiagramToolIntegrationId,
   enabled: Schema.Boolean,
 });
-export type ServerSetDrawioMcpEnabledResult = typeof ServerSetDrawioMcpEnabledResult.Type;
+export type ServerSetDiagramToolMcpEnabledResult = typeof ServerSetDiagramToolMcpEnabledResult.Type;
 
 export const ServerConfigUpdatedPayload = Schema.Struct({
   issues: ServerConfigIssues,

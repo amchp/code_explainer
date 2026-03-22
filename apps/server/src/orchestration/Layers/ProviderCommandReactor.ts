@@ -2,6 +2,7 @@ import {
   type ChatAttachment,
   CommandId,
   DEFAULT_GIT_TEXT_GENERATION_MODEL,
+  type DiagramToolIntegrationId,
   EventId,
   type OrchestrationEvent,
   type ProviderModelOptions,
@@ -196,6 +197,7 @@ const make = Effect.gen(function* () {
       readonly provider?: ProviderKind;
       readonly model?: string;
       readonly modelOptions?: ProviderModelOptions;
+      readonly diagramProvider?: DiagramToolIntegrationId;
       readonly providerOptions?: ProviderStartOptions;
     },
   ) {
@@ -319,6 +321,7 @@ const make = Effect.gen(function* () {
     readonly provider?: ProviderKind;
     readonly model?: string;
     readonly modelOptions?: ProviderModelOptions;
+    readonly diagramProvider?: DiagramToolIntegrationId;
     readonly providerOptions?: ProviderStartOptions;
     readonly interactionMode?: "default" | "plan";
     readonly createdAt: string;
@@ -355,6 +358,7 @@ const make = Effect.gen(function* () {
       ...(normalizedAttachments.length > 0 ? { attachments: normalizedAttachments } : {}),
       ...(modelForTurn !== undefined ? { model: modelForTurn } : {}),
       ...(input.modelOptions !== undefined ? { modelOptions: input.modelOptions } : {}),
+      ...(input.diagramProvider !== undefined ? { diagramProvider: input.diagramProvider } : {}),
       ...(input.interactionMode !== undefined ? { interactionMode: input.interactionMode } : {}),
     });
   });
@@ -471,6 +475,9 @@ const make = Effect.gen(function* () {
       ...(event.payload.model !== undefined ? { model: event.payload.model } : {}),
       ...(event.payload.modelOptions !== undefined
         ? { modelOptions: event.payload.modelOptions }
+        : {}),
+      ...(event.payload.diagramProvider !== undefined
+        ? { diagramProvider: event.payload.diagramProvider }
         : {}),
       ...(event.payload.providerOptions !== undefined
         ? { providerOptions: event.payload.providerOptions }

@@ -31,8 +31,8 @@ import type {
   TerminalWriteInput,
 } from "./terminal";
 import type {
-  ServerSetDrawioMcpEnabledInput,
-  ServerSetDrawioMcpEnabledResult,
+  ServerSetDiagramToolMcpEnabledInput,
+  ServerSetDiagramToolMcpEnabledResult,
   ServerUpsertKeybindingInput,
   ServerUpsertKeybindingResult,
 } from "./server";
@@ -151,9 +151,9 @@ export interface NativeApi {
   server: {
     getConfig: () => Promise<ServerConfig>;
     upsertKeybinding: (input: ServerUpsertKeybindingInput) => Promise<ServerUpsertKeybindingResult>;
-    setDrawioMcpEnabled: (
-      input: ServerSetDrawioMcpEnabledInput,
-    ) => Promise<ServerSetDrawioMcpEnabledResult>;
+    setDiagramToolMcpEnabled: (
+      input: ServerSetDiagramToolMcpEnabledInput,
+    ) => Promise<ServerSetDiagramToolMcpEnabledResult>;
   };
   orchestration: {
     getSnapshot: () => Promise<OrchestrationReadModel>;

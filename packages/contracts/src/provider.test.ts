@@ -49,6 +49,7 @@ describe("ProviderSendTurnInput", () => {
     const parsed = decodeProviderSendTurnInput({
       threadId: "thread-1",
       model: "gpt-5.3-codex",
+      diagramProvider: "drawio",
       modelOptions: {
         codex: {
           reasoningEffort: "xhigh",
@@ -58,6 +59,7 @@ describe("ProviderSendTurnInput", () => {
     });
 
     expect(parsed.model).toBe("gpt-5.3-codex");
+    expect(parsed.diagramProvider).toBe("drawio");
     expect(parsed.modelOptions?.codex?.reasoningEffort).toBe("xhigh");
     expect(parsed.modelOptions?.codex?.fastMode).toBe(true);
   });

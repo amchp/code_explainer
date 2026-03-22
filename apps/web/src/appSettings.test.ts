@@ -66,11 +66,8 @@ describe("timestamp format defaults", () => {
   });
 });
 
-describe("drawioMcpEnabled", () => {
-  it("is included in AppSettings type as a boolean field", () => {
-    // Verify the type exists at runtime by confirming the settings type
-    // accepts drawioMcpEnabled. The default (false) is applied via
-    // Schema.withConstructorDefault in the schema definition.
+describe("diagram MCP settings", () => {
+  it("includes persisted flags for installable diagram integrations", () => {
     const settings: import("./appSettings").AppSettings = {
       codexBinaryPath: "",
       codexHomePath: "",
@@ -79,7 +76,15 @@ describe("drawioMcpEnabled", () => {
       timestampFormat: "locale",
       customCodexModels: [],
       drawioMcpEnabled: false,
+      mermaidMcpEnabled: false,
+      plantumlMcpEnabled: false,
+      graphvizMcpEnabled: false,
+      excalidrawMcpEnabled: false,
     };
     expect(settings.drawioMcpEnabled).toBe(false);
+    expect(settings.mermaidMcpEnabled).toBe(false);
+    expect(settings.plantumlMcpEnabled).toBe(false);
+    expect(settings.graphvizMcpEnabled).toBe(false);
+    expect(settings.excalidrawMcpEnabled).toBe(false);
   });
 });

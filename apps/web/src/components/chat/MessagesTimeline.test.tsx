@@ -93,4 +93,109 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("lucide-terminal");
     expect(markup).toContain("yoo what&#x27;s ");
   });
+
+  it("renders assistant image attachments inline", async () => {
+    const { MessagesTimeline } = await import("./MessagesTimeline");
+    const markup = renderToStaticMarkup(
+      <MessagesTimeline
+        hasMessages
+        isWorking={false}
+        activeTurnInProgress={false}
+        activeTurnStartedAt={null}
+        scrollContainer={null}
+        timelineEntries={[
+          {
+            id: "entry-assistant-1",
+            kind: "message",
+            createdAt: "2026-03-17T19:12:29.000Z",
+            message: {
+              id: MessageId.makeUnsafe("message-assistant-1"),
+              role: "assistant",
+              text: "",
+              createdAt: "2026-03-17T19:12:29.000Z",
+              streaming: false,
+              attachments: [
+                {
+                  type: "image",
+                  id: "attachment-1",
+                  name: "system-architecture.png",
+                  mimeType: "image/png",
+                  sizeBytes: 1024,
+                  previewUrl: "https://example.com/attachments/attachment-1.png",
+                },
+              ],
+            },
+          },
+        ]}
+        completionDividerBeforeEntryId={null}
+        completionSummary={null}
+        nowIso="2026-03-17T19:12:30.000Z"
+        expandedWorkGroups={{}}
+        onToggleWorkGroup={() => {}}
+        revertTurnCountByUserMessageId={new Map()}
+        onRevertUserMessage={() => {}}
+        isRevertingCheckpoint={false}
+        onImageExpand={() => {}}
+        markdownCwd={undefined}
+        timestampFormat="locale"
+        workspaceRoot={undefined}
+      />,
+    );
+
+    expect(markup).toContain("system-architecture.png");
+    expect(markup).toContain("https://example.com/attachments/attachment-1.png");
+    expect(markup).toContain("img");
+  });
+
+  it("does not render placeholder text for assistant image-only messages", async () => {
+    const { MessagesTimeline } = await import("./MessagesTimeline");
+    const markup = renderToStaticMarkup(
+      <MessagesTimeline
+        hasMessages
+        isWorking={false}
+        activeTurnInProgress={false}
+        activeTurnStartedAt={null}
+        scrollContainer={null}
+        timelineEntries={[
+          {
+            id: "entry-assistant-image-only",
+            kind: "message",
+            createdAt: "2026-03-17T19:12:29.000Z",
+            message: {
+              id: MessageId.makeUnsafe("message-assistant-image-only"),
+              role: "assistant",
+              text: "",
+              createdAt: "2026-03-17T19:12:29.000Z",
+              streaming: false,
+              attachments: [
+                {
+                  type: "image",
+                  id: "attachment-image-only",
+                  name: "diagram.png",
+                  mimeType: "image/png",
+                  sizeBytes: 1024,
+                  previewUrl: "https://example.com/attachments/attachment-image-only.png",
+                },
+              ],
+            },
+          },
+        ]}
+        completionDividerBeforeEntryId={null}
+        completionSummary={null}
+        nowIso="2026-03-17T19:12:30.000Z"
+        expandedWorkGroups={{}}
+        onToggleWorkGroup={() => {}}
+        revertTurnCountByUserMessageId={new Map()}
+        onRevertUserMessage={() => {}}
+        isRevertingCheckpoint={false}
+        onImageExpand={() => {}}
+        markdownCwd={undefined}
+        timestampFormat="locale"
+        workspaceRoot={undefined}
+      />,
+    );
+
+    expect(markup).not.toContain("(empty response)");
+    expect(markup).toContain("attachment-image-only.png");
+  });
 });

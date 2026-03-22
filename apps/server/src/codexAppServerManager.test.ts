@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ApprovalRequestId, ThreadId } from "@t3tools/contracts";
+import { buildDiagramProviderDeveloperInstructions } from "@t3tools/shared/diagramTools";
 
 import {
   buildCodexInitializeParams,
@@ -181,6 +182,13 @@ describe("normalizeCodexModelSlug", () => {
   it("keeps non-aliased models as-is", () => {
     expect(normalizeCodexModelSlug("gpt-5.2-codex")).toBe("gpt-5.2-codex");
     expect(normalizeCodexModelSlug("gpt-5.2")).toBe("gpt-5.2");
+  });
+});
+
+describe("default collaboration instructions", () => {
+  it("tell Codex to publish final user-facing images into chat", () => {
+    expect(CODEX_DEFAULT_MODE_DEVELOPER_INSTRUCTIONS).toContain("publish_images_to_chat");
+    expect(CODEX_PLAN_MODE_DEVELOPER_INSTRUCTIONS).toContain("publish_images_to_chat");
   });
 });
 
@@ -501,6 +509,40 @@ describe("sendTurn", () => {
           model: "gpt-5.3-codex",
           reasoning_effort: "medium",
           developer_instructions: CODEX_DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
+        },
+      },
+    });
+  });
+
+  it("appends selected diagram provider instructions to the collaboration preset", async () => {
+    const { manager, context, sendRequest } = createSendTurnHarness();
+
+    await manager.sendTurn({
+      threadId: asThreadId("thread_1"),
+      input: "Create an architecture diagram",
+      interactionMode: "default",
+      diagramProvider: "drawio",
+    });
+
+    expect(sendRequest).toHaveBeenCalledWith(context, "turn/start", {
+      threadId: "thread_1",
+      input: [
+        {
+          type: "text",
+          text: "Create an architecture diagram",
+          text_elements: [],
+        },
+      ],
+      model: "gpt-5.3-codex",
+      collaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: "medium",
+          developer_instructions: [
+            CODEX_DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
+            buildDiagramProviderDeveloperInstructions("drawio"),
+          ].join("\n\n"),
         },
       },
     });

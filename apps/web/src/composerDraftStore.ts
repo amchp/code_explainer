@@ -1,5 +1,6 @@
 import {
   DEFAULT_REASONING_EFFORT_BY_PROVIDER,
+  type DiagramToolIntegrationId,
   ProjectId,
   REASONING_EFFORT_OPTIONS_BY_PROVIDER,
   ThreadId,
@@ -91,6 +92,7 @@ interface PersistedComposerThreadDraftState {
   terminalContexts?: PersistedTerminalContextDraft[];
   provider?: ProviderKind | null;
   model?: string | null;
+  diagramProvider?: DiagramToolIntegrationId | null;
   runtimeMode?: RuntimeMode | null;
   interactionMode?: ProviderInteractionMode | null;
   effort?: CodexReasoningEffort | null;
@@ -121,6 +123,7 @@ interface ComposerThreadDraftState {
   terminalContexts: TerminalContextDraft[];
   provider: ProviderKind | null;
   model: string | null;
+  diagramProvider: DiagramToolIntegrationId | null;
   runtimeMode: RuntimeMode | null;
   interactionMode: ProviderInteractionMode | null;
   effort: CodexReasoningEffort | null;
@@ -175,6 +178,10 @@ interface ComposerDraftStoreState {
   setTerminalContexts: (threadId: ThreadId, contexts: TerminalContextDraft[]) => void;
   setProvider: (threadId: ThreadId, provider: ProviderKind | null | undefined) => void;
   setModel: (threadId: ThreadId, model: string | null | undefined) => void;
+  setDiagramProvider: (
+    threadId: ThreadId,
+    diagramProvider: DiagramToolIntegrationId | null | undefined,
+  ) => void;
   setRuntimeMode: (threadId: ThreadId, runtimeMode: RuntimeMode | null | undefined) => void;
   setInteractionMode: (
     threadId: ThreadId,
@@ -226,6 +233,7 @@ const EMPTY_THREAD_DRAFT = Object.freeze({
   terminalContexts: EMPTY_TERMINAL_CONTEXTS,
   provider: null,
   model: null,
+  diagramProvider: null,
   runtimeMode: null,
   interactionMode: null,
   effort: null,
@@ -245,6 +253,7 @@ function createEmptyThreadDraft(): ComposerThreadDraftState {
     terminalContexts: [],
     provider: null,
     model: null,
+    diagramProvider: null,
     runtimeMode: null,
     interactionMode: null,
     effort: null,
@@ -317,6 +326,7 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
     draft.terminalContexts.length === 0 &&
     draft.provider === null &&
     draft.model === null &&
+    draft.diagramProvider === null &&
     draft.runtimeMode === null &&
     draft.interactionMode === null &&
     draft.effort === null &&
@@ -326,6 +336,19 @@ function shouldRemoveDraft(draft: ComposerThreadDraftState): boolean {
 
 function normalizeProviderKind(value: unknown): ProviderKind | null {
   return value === "codex" ? value : null;
+}
+
+function normalizeDiagramProvider(value: unknown): DiagramToolIntegrationId | null {
+  switch (value) {
+    case "drawio":
+    case "mermaid":
+    case "plantuml":
+    case "graphviz":
+    case "excalidraw":
+      return value;
+    default:
+      return null;
+  }
 }
 
 function revokeObjectPreviewUrl(previewUrl: string): void {
@@ -528,6 +551,7 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
       typeof draftCandidate.model === "string"
         ? normalizeModelSlug(draftCandidate.model, provider ?? "codex")
         : null;
+    const diagramProvider = normalizeDiagramProvider(draftCandidate.diagramProvider);
     const runtimeMode =
       draftCandidate.runtimeMode === "read-only" ||
       draftCandidate.runtimeMode === "approval-required" ||
@@ -557,6 +581,7 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
       terminalContexts.length === 0 &&
       !provider &&
       !model &&
+      !diagramProvider &&
       !runtimeMode &&
       !interactionMode &&
       !effort &&
@@ -570,6 +595,7 @@ function normalizePersistedComposerDraftState(value: unknown): PersistedComposer
       ...(terminalContexts.length > 0 ? { terminalContexts } : {}),
       ...(provider ? { provider } : {}),
       ...(model ? { model } : {}),
+      ...(diagramProvider ? { diagramProvider } : {}),
       ...(runtimeMode ? { runtimeMode } : {}),
       ...(interactionMode ? { interactionMode } : {}),
       ...(effort ? { effort } : {}),
@@ -681,6 +707,7 @@ function toHydratedThreadDraft(
       })) ?? [],
     provider: persistedDraft.provider ?? null,
     model: persistedDraft.model ?? null,
+    diagramProvider: persistedDraft.diagramProvider ?? null,
     runtimeMode: persistedDraft.runtimeMode ?? null,
     interactionMode: persistedDraft.interactionMode ?? null,
     effort: persistedDraft.effort ?? null,
@@ -1019,12 +1046,43 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
           return { draftsByThreadId: nextDraftsByThreadId };
         });
       },
+      setDiagramProvider: (threadId, diagramProvider) => {
+        if (threadId.length === 0) {
+          return;
+        }
+        const normalizedDiagramProvider = normalizeDiagramProvider(diagramProvider);
+        set((state) => {
+          const existing = state.draftsByThreadId[threadId];
+          if (!existing && normalizedDiagramProvider === null) {
+            return state;
+          }
+          const base = existing ?? createEmptyThreadDraft();
+          if (base.diagramProvider === normalizedDiagramProvider) {
+            return state;
+          }
+          const nextDraft: ComposerThreadDraftState = {
+            ...base,
+            diagramProvider: normalizedDiagramProvider,
+          };
+          const nextDraftsByThreadId = { ...state.draftsByThreadId };
+          if (shouldRemoveDraft(nextDraft)) {
+            delete nextDraftsByThreadId[threadId];
+          } else {
+            nextDraftsByThreadId[threadId] = nextDraft;
+          }
+          return { draftsByThreadId: nextDraftsByThreadId };
+        });
+      },
       setRuntimeMode: (threadId, runtimeMode) => {
         if (threadId.length === 0) {
           return;
         }
         const nextRuntimeMode =
-          runtimeMode === "read-only" || runtimeMode === "approval-required" || runtimeMode === "full-access" ? runtimeMode : null;
+          runtimeMode === "read-only" ||
+          runtimeMode === "approval-required" ||
+          runtimeMode === "full-access"
+            ? runtimeMode
+            : null;
         set((state) => {
           const existing = state.draftsByThreadId[threadId];
           if (!existing && nextRuntimeMode === null) {
@@ -1488,6 +1546,7 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
             draft.terminalContexts.length === 0 &&
             draft.provider === null &&
             draft.model === null &&
+            draft.diagramProvider === null &&
             draft.runtimeMode === null &&
             draft.interactionMode === null &&
             draft.effort === null &&
@@ -1515,6 +1574,9 @@ export const useComposerDraftStore = create<ComposerDraftStoreState>()(
           }
           if (draft.provider) {
             persistedDraft.provider = draft.provider;
+          }
+          if (draft.diagramProvider) {
+            persistedDraft.diagramProvider = draft.diagramProvider;
           }
           if (draft.runtimeMode) {
             persistedDraft.runtimeMode = draft.runtimeMode;

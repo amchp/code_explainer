@@ -157,8 +157,8 @@ export function createWsNativeApi(): NativeApi {
     server: {
       getConfig: () => transport.request(WS_METHODS.serverGetConfig),
       upsertKeybinding: (input) => transport.request(WS_METHODS.serverUpsertKeybinding, input),
-      setDrawioMcpEnabled: (input) =>
-        transport.request(WS_METHODS.serverSetDrawioMcpEnabled, input),
+      setDiagramToolMcpEnabled: (input) =>
+        transport.request(WS_METHODS.serverSetDiagramToolMcpEnabled, input),
     },
     orchestration: {
       getSnapshot: () => transport.request(ORCHESTRATION_WS_METHODS.getSnapshot),

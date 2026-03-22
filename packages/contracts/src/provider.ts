@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { TrimmedNonEmptyString } from "./baseSchemas";
+import { DiagramToolIntegrationId } from "./diagram";
 import { ProviderModelOptions } from "./model";
 import {
   ApprovalRequestId,
@@ -81,6 +82,7 @@ export const ProviderSendTurnInput = Schema.Struct({
   ),
   model: Schema.optional(TrimmedNonEmptyStringSchema),
   modelOptions: Schema.optional(ProviderModelOptions),
+  diagramProvider: Schema.optional(DiagramToolIntegrationId),
   interactionMode: Schema.optional(ProviderInteractionMode),
 });
 export type ProviderSendTurnInput = typeof ProviderSendTurnInput.Type;

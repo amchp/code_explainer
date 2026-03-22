@@ -176,6 +176,7 @@ validationLayer("CodexAdapterLive validation", (it) => {
       assert.deepStrictEqual(validationManager.startSessionImpl.mock.calls[0]?.[0], {
         provider: "codex",
         threadId: asThreadId("thread-1"),
+        stateDir: process.cwd(),
         model: "gpt-5.3-codex",
         serviceTier: "fast",
         runtimeMode: "full-access",
@@ -233,6 +234,7 @@ sessionErrorLayer("CodexAdapterLive session errors", (it) => {
           threadId: asThreadId("sess-missing"),
           input: "hello",
           model: "gpt-5.3-codex",
+          diagramProvider: "graphviz",
           modelOptions: {
             codex: {
               reasoningEffort: "high",
@@ -249,6 +251,7 @@ sessionErrorLayer("CodexAdapterLive session errors", (it) => {
         model: "gpt-5.3-codex",
         effort: "high",
         serviceTier: "fast",
+        diagramProvider: "graphviz",
       });
     }),
   );

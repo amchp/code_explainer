@@ -1,7 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { type ProviderKind, DEFAULT_GIT_TEXT_GENERATION_MODEL } from "@t3tools/contracts";
+import {
+  type DiagramToolIntegrationId,
+  type ProviderKind,
+  DEFAULT_GIT_TEXT_GENERATION_MODEL,
+} from "@t3tools/contracts";
+import {
+  DIAGRAM_TOOL_DEFINITIONS,
+  type InstallableDiagramToolDefinition,
+} from "@t3tools/shared/diagramTools";
 import { getModelOptions, normalizeModelSlug } from "@t3tools/shared/model";
 import { getAppModelOptions, MAX_CUSTOM_MODEL_LENGTH, useAppSettings } from "../appSettings";
 import { resolveAndPersistPreferredEditor } from "../editorPreferences";
@@ -92,12 +100,28 @@ function patchCustomModels(provider: ProviderKind, models: string[]) {
   }
 }
 
+function isDiagramToolInstalled(
+  settings: ReturnType<typeof useAppSettings>["settings"],
+  definition: InstallableDiagramToolDefinition,
+) {
+  return settings[definition.settingsKey];
+}
+
+function patchDiagramToolInstalled(definition: InstallableDiagramToolDefinition, enabled: boolean) {
+  return { [definition.settingsKey]: enabled } as const;
+}
+
 function SettingsRouteView() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { settings, defaults, updateSettings } = useAppSettings();
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const [isOpeningKeybindings, setIsOpeningKeybindings] = useState(false);
   const [openKeybindingsError, setOpenKeybindingsError] = useState<string | null>(null);
+  const [installingDiagramToolId, setInstallingDiagramToolId] =
+    useState<DiagramToolIntegrationId | null>(null);
+  const [diagramToolInstallErrors, setDiagramToolInstallErrors] = useState<
+    Partial<Record<DiagramToolIntegrationId, string | null>>
+  >({});
   const [customModelInputByProvider, setCustomModelInputByProvider] = useState<
     Record<ProviderKind, string>
   >({
@@ -145,6 +169,37 @@ function SettingsRouteView() {
         setIsOpeningKeybindings(false);
       });
   }, [availableEditors, keybindingsConfigPath]);
+
+  const installDiagramTool = useCallback(
+    (definition: InstallableDiagramToolDefinition) => {
+      if (isDiagramToolInstalled(settings, definition) || installingDiagramToolId) return;
+
+      setDiagramToolInstallErrors((existing) => ({
+        ...existing,
+        [definition.id]: null,
+      }));
+      setInstallingDiagramToolId(definition.id);
+      const api = ensureNativeApi();
+      void api.server
+        .setDiagramToolMcpEnabled({ integration: definition.id, enabled: true })
+        .then(() => {
+          updateSettings(patchDiagramToolInstalled(definition, true));
+        })
+        .catch((error) => {
+          setDiagramToolInstallErrors((existing) => ({
+            ...existing,
+            [definition.id]:
+              error instanceof Error
+                ? error.message
+                : `Unable to install ${definition.title.toLowerCase()}.`,
+          }));
+        })
+        .finally(() => {
+          setInstallingDiagramToolId(null);
+        });
+    },
+    [installingDiagramToolId, settings, updateSettings],
+  );
 
   const addCustomModel = useCallback(
     (provider: ProviderKind) => {
@@ -697,52 +752,46 @@ function SettingsRouteView() {
               <div className="mb-4">
                 <h2 className="text-sm font-medium text-foreground">Integrations</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Enable optional tool integrations for chat sessions.
+                  Enable optional diagram tools for chat sessions.
                 </p>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Draw.io diagrams</p>
-                  <p className="text-xs text-muted-foreground">
-                    Allow the assistant to create and edit draw.io diagrams via MCP. The server is
-                    installed automatically when enabled.
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.drawioMcpEnabled}
-                  onCheckedChange={(checked) => {
-                    const enabled = Boolean(checked);
-                    updateSettings({ drawioMcpEnabled: enabled });
-                    const api = ensureNativeApi();
-                    void api.server
-                      .setDrawioMcpEnabled({ enabled })
-                      .catch(() => {
-                        // Revert on failure
-                        updateSettings({ drawioMcpEnabled: !enabled });
-                      });
-                  }}
-                  aria-label="Enable draw.io MCP integration"
-                />
-              </div>
+              <div className="space-y-3">
+                {DIAGRAM_TOOL_DEFINITIONS.map((definition) => {
+                  const isInstalling = installingDiagramToolId === definition.id;
+                  const installError = diagramToolInstallErrors[definition.id];
+                  const isInstalled = isDiagramToolInstalled(settings, definition);
 
-              {settings.drawioMcpEnabled !== defaults.drawioMcpEnabled ? (
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => {
-                      updateSettings({ drawioMcpEnabled: defaults.drawioMcpEnabled });
-                      const api = ensureNativeApi();
-                      void api.server.setDrawioMcpEnabled({
-                        enabled: defaults.drawioMcpEnabled,
-                      });
-                    }}
-                  >
-                    Restore default
-                  </Button>
-                </div>
-              ) : null}
+                  return (
+                    <div
+                      key={definition.id}
+                      className="rounded-lg border border-border bg-background px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{definition.title}</p>
+                          <p className="text-xs text-muted-foreground">{definition.description}</p>
+                        </div>
+                        <Button
+                          size="xs"
+                          variant={isInstalled ? "outline" : "default"}
+                          disabled={isInstalled || installingDiagramToolId !== null}
+                          onClick={() => installDiagramTool(definition)}
+                        >
+                          {isInstalled ? "Installed" : isInstalling ? "Installing..." : "Install"}
+                        </Button>
+                      </div>
+
+                      {definition.note ? (
+                        <p className="mt-2 text-xs text-muted-foreground">{definition.note}</p>
+                      ) : null}
+                      {installError ? (
+                        <p className="mt-2 text-xs text-destructive">{installError}</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
 
             <section className="rounded-2xl border border-border bg-card p-5">

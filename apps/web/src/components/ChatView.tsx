@@ -2,6 +2,7 @@ import {
   type ApprovalRequestId,
   DEFAULT_MODEL_BY_PROVIDER,
   type CodexReasoningEffort,
+  type DiagramToolIntegrationId,
   type MessageId,
   type ProjectEntry,
   type ProjectScript,
@@ -24,6 +25,7 @@ import {
   normalizeModelSlug,
   resolveModelSlugForProvider,
 } from "@t3tools/shared/model";
+import { getEnabledDiagramToolDefinitions } from "@t3tools/shared/diagramTools";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@tanstack/react-pacer";
@@ -122,6 +124,7 @@ import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+import { DiagramProviderPicker } from "./chat/DiagramProviderPicker";
 import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
 import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
 import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
@@ -221,6 +224,9 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const setComposerDraftPrompt = useComposerDraftStore((store) => store.setPrompt);
   const setComposerDraftProvider = useComposerDraftStore((store) => store.setProvider);
   const setComposerDraftModel = useComposerDraftStore((store) => store.setModel);
+  const setComposerDraftDiagramProvider = useComposerDraftStore(
+    (store) => store.setDiagramProvider,
+  );
   const setComposerDraftInteractionMode = useComposerDraftStore(
     (store) => store.setInteractionMode,
   );
@@ -580,6 +586,19 @@ export default function ChatView({ threadId }: ChatViewProps) {
     () => getCustomModelOptionsByProvider(settings),
     [settings],
   );
+  const installedDiagramTools = useMemo(
+    () => getEnabledDiagramToolDefinitions(settings),
+    [settings],
+  );
+  const selectedDiagramProvider = useMemo(() => {
+    const draftDiagramProvider = composerDraft.diagramProvider;
+    if (!draftDiagramProvider) {
+      return null;
+    }
+    return installedDiagramTools.some((definition) => definition.id === draftDiagramProvider)
+      ? draftDiagramProvider
+      : null;
+  }, [composerDraft.diagramProvider, installedDiagramTools]);
   const selectedModelForPickerWithCustomFallback = useMemo(() => {
     const currentOptions = modelOptionsByProvider[selectedProvider];
     return currentOptions.some((option) => option.slug === selectedModelForPicker)
@@ -2217,6 +2236,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           attachments: turnAttachments,
         },
         model: selectedModel || undefined,
+        ...(selectedDiagramProvider ? { diagramProvider: selectedDiagramProvider } : {}),
         ...(selectedModelOptionsForDispatch
           ? { modelOptions: selectedModelOptionsForDispatch }
           : {}),
@@ -2498,6 +2518,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           },
           provider: selectedProvider,
           model: selectedModel || undefined,
+          ...(selectedDiagramProvider ? { diagramProvider: selectedDiagramProvider } : {}),
           ...(selectedModelOptionsForDispatch
             ? { modelOptions: selectedModelOptionsForDispatch }
             : {}),
@@ -2540,6 +2561,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       resetSendPhase,
       runtimeMode,
       selectedModel,
+      selectedDiagramProvider,
       selectedModelOptionsForDispatch,
       providerOptionsForDispatch,
       selectedProvider,
@@ -2609,6 +2631,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           },
           provider: selectedProvider,
           model: selectedModel || undefined,
+          ...(selectedDiagramProvider ? { diagramProvider: selectedDiagramProvider } : {}),
           ...(selectedModelOptionsForDispatch
             ? { modelOptions: selectedModelOptionsForDispatch }
             : {}),
@@ -2661,6 +2684,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
     resetSendPhase,
     runtimeMode,
     selectedModel,
+    selectedDiagramProvider,
     selectedModelOptionsForDispatch,
     providerOptionsForDispatch,
     selectedProvider,
@@ -2690,6 +2714,16 @@ export default function ChatView({ threadId }: ChatViewProps) {
       setComposerDraftProvider,
       settings.customCodexModels,
     ],
+  );
+  const onDiagramProviderSelect = useCallback(
+    (diagramProvider: DiagramToolIntegrationId) => {
+      if (!activeThread) {
+        return;
+      }
+      setComposerDraftDiagramProvider(activeThread.id, diagramProvider);
+      scheduleComposerFocus();
+    },
+    [activeThread, scheduleComposerFocus, setComposerDraftDiagramProvider],
   );
   const onEffortSelect = useCallback(
     (effort: CodexReasoningEffort) => {
@@ -3269,6 +3303,14 @@ export default function ChatView({ threadId }: ChatViewProps) {
                         modelOptionsByProvider={modelOptionsByProvider}
                         onProviderModelChange={onProviderModelSelect}
                       />
+                      {installedDiagramTools.length > 0 ? (
+                        <DiagramProviderPicker
+                          compact={isComposerFooterCompact}
+                          installedDiagramTools={installedDiagramTools}
+                          selectedDiagramProvider={selectedDiagramProvider}
+                          onDiagramProviderChange={onDiagramProviderSelect}
+                        />
+                      ) : null}
 
                       {isComposerFooterCompact ? (
                         <CompactComposerControlsMenu

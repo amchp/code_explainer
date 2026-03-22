@@ -2057,4 +2057,153 @@ describe("ProviderRuntimeIngestion", () => {
     expect(thread.session?.status).toBe("error");
     expect(thread.session?.lastError).toBe("runtime still processed");
   });
+
+  it("attaches explicitly published images to the final assistant message", async () => {
+    const harness = await createHarness();
+    const turnId = asTurnId("turn-publish");
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "content.delta",
+      eventId: asEventId("evt-assistant-delta"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId,
+      itemId: asItemId("msg_publish"),
+      payload: {
+        streamKind: "assistant_text",
+        delta: "Published the diagram.",
+      },
+    });
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-publish-tool"),
+      provider: "codex",
+      createdAt: new Date().toISOString(),
+      threadId: asThreadId("thread-1"),
+      turnId,
+      itemId: asItemId("tool_publish"),
+      payload: {
+        itemType: "mcp_tool_call",
+        data: {
+          item: {
+            toolName: "publish_images_to_chat",
+            result: {
+              structuredContent: {
+                published: [
+                  {
+                    id: "attachment-published-1",
+                    name: "diagram.png",
+                    mimeType: "image/png",
+                    sizeBytes: 1024,
+                  },
+                ],
+                skipped: [],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-assistant-complete"),
+      provider: "codex",
+      createdAt: new Date().toISOString(),
+      threadId: asThreadId("thread-1"),
+      turnId,
+      itemId: asItemId("msg_publish"),
+      payload: {
+        itemType: "assistant_message",
+        detail: "Published the diagram.",
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.messages.some(
+        (message: ProviderRuntimeTestMessage) =>
+          message.id === "assistant:msg_publish" &&
+          message.streaming === false &&
+          message.attachments?.some((attachment) => attachment.id === "attachment-published-1") ===
+            true,
+      ),
+    );
+
+    const assistantMessage = thread.messages.find(
+      (message: ProviderRuntimeTestMessage) => message.id === "assistant:msg_publish",
+    );
+    expect(assistantMessage?.text).toBe("Published the diagram.");
+    expect(assistantMessage?.attachments).toEqual([
+      expect.objectContaining({
+        id: "attachment-published-1",
+        name: "diagram.png",
+        mimeType: "image/png",
+        sizeBytes: 1024,
+      }),
+    ]);
+  });
+
+  it("ignores non-publish MCP tool completions for assistant attachments", async () => {
+    const harness = await createHarness();
+    const turnId = asTurnId("turn-non-publish");
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-non-publish-tool"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId,
+      itemId: asItemId("tool_other"),
+      payload: {
+        itemType: "mcp_tool_call",
+        data: {
+          item: {
+            toolName: "graphviz.generate_diagram_url",
+            result: {
+              structuredContent: {
+                published: [
+                  {
+                    id: "attachment-ignored",
+                    name: "diagram.png",
+                    mimeType: "image/png",
+                    sizeBytes: 1024,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-assistant-complete-no-attachment"),
+      provider: "codex",
+      createdAt: new Date().toISOString(),
+      threadId: asThreadId("thread-1"),
+      turnId,
+      itemId: asItemId("msg_no_attachment"),
+      payload: {
+        itemType: "assistant_message",
+        detail: "No published image.",
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.messages.some(
+        (message: ProviderRuntimeTestMessage) => message.id === "assistant:msg_no_attachment",
+      ),
+    );
+
+    const assistantMessage = thread.messages.find(
+      (message: ProviderRuntimeTestMessage) => message.id === "assistant:msg_no_attachment",
+    );
+    expect(assistantMessage?.attachments).toBeUndefined();
+  });
 });

@@ -6,6 +6,7 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   OrchestrationGetTurnDiffInput,
+  OrchestrationCommand,
   OrchestrationProposedPlan,
   OrchestrationSession,
   ProjectCreateCommand,
@@ -25,6 +26,7 @@ const decodeThreadTurnStartRequestedPayload = Schema.decodeUnknownEffect(
 const decodeOrchestrationProposedPlan = Schema.decodeUnknownEffect(OrchestrationProposedPlan);
 const decodeOrchestrationSession = Schema.decodeUnknownEffect(OrchestrationSession);
 const decodeThreadCreatedPayload = Schema.decodeUnknownEffect(ThreadCreatedPayload);
+const decodeOrchestrationCommand = Schema.decodeUnknownEffect(OrchestrationCommand);
 
 it.effect("parses turn diff input when fromTurnCount <= toTurnCount", () =>
   Effect.gen(function* () {
@@ -174,6 +176,7 @@ it.effect("accepts provider-scoped model options in thread.turn.start", () =>
       },
       provider: "codex",
       model: "gpt-5.3-codex",
+      diagramProvider: "mermaid",
       modelOptions: {
         codex: {
           reasoningEffort: "high",
@@ -183,6 +186,7 @@ it.effect("accepts provider-scoped model options in thread.turn.start", () =>
       createdAt: "2026-01-01T00:00:00.000Z",
     });
     assert.strictEqual(parsed.provider, "codex");
+    assert.strictEqual(parsed.diagramProvider, "mermaid");
     assert.strictEqual(parsed.modelOptions?.codex?.reasoningEffort, "high");
     assert.strictEqual(parsed.modelOptions?.codex?.fastMode, true);
   }),
@@ -210,6 +214,41 @@ it.effect("accepts a source proposed plan reference in thread.turn.start", () =>
       threadId: "thread-1",
       planId: "plan-1",
     });
+  }),
+);
+
+it.effect("accepts assistant completion commands with image attachments", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decodeOrchestrationCommand({
+      type: "thread.message.assistant.complete",
+      commandId: "cmd-assistant-complete",
+      threadId: "thread-1",
+      messageId: "message-1",
+      attachments: [
+        {
+          type: "image",
+          id: "attachment-1",
+          name: "diagram.png",
+          mimeType: "image/png",
+          sizeBytes: 1024,
+        },
+      ],
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    assert.strictEqual(parsed.type, "thread.message.assistant.complete");
+    if (parsed.type !== "thread.message.assistant.complete") {
+      return;
+    }
+    assert.deepStrictEqual(parsed.attachments, [
+      {
+        type: "image",
+        id: "attachment-1",
+        name: "diagram.png",
+        mimeType: "image/png",
+        sizeBytes: 1024,
+      },
+    ]);
   }),
 );
 

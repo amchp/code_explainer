@@ -1,6 +1,7 @@
 import {
   ApprovalRequestId,
   type AssistantDeliveryMode,
+  type ChatAttachment,
   CommandId,
   MessageId,
   type OrchestrationEvent,
@@ -37,8 +38,11 @@ const BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_CACHE_CAPACITY = 20_000;
 const BUFFERED_MESSAGE_TEXT_BY_MESSAGE_ID_TTL = Duration.minutes(120);
 const BUFFERED_PROPOSED_PLAN_BY_ID_CACHE_CAPACITY = 10_000;
 const BUFFERED_PROPOSED_PLAN_BY_ID_TTL = Duration.minutes(120);
+const BUFFERED_ASSISTANT_ATTACHMENTS_BY_TURN_CACHE_CAPACITY = 10_000;
+const BUFFERED_ASSISTANT_ATTACHMENTS_BY_TURN_TTL = Duration.minutes(120);
 const MAX_BUFFERED_ASSISTANT_CHARS = 24_000;
 const STRICT_PROVIDER_LIFECYCLE_GUARD = process.env.T3CODE_STRICT_PROVIDER_LIFECYCLE_GUARD !== "0";
+const PUBLISH_IMAGES_TO_CHAT_TOOL_NAME = "publish_images_to_chat";
 
 type TurnStartRequestedDomainEvent = Extract<
   OrchestrationEvent,
@@ -99,6 +103,109 @@ function proposedPlanIdFromEvent(event: ProviderRuntimeEvent, threadId: ThreadId
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function asArray(value: unknown): unknown[] | undefined {
+  return Array.isArray(value) ? value : undefined;
+}
+
+function extractPublishToolName(payload: Record<string, unknown> | undefined): string | undefined {
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  return (
+    asString(item?.toolName) ??
+    asString(item?.tool_name) ??
+    asString(item?.name) ??
+    asString(data?.toolName) ??
+    asString(data?.tool_name) ??
+    asString(data?.name)
+  );
+}
+
+function parsePublishedAttachments(value: unknown): ChatAttachment[] {
+  const published = asArray(asRecord(value)?.published);
+  if (!published) {
+    return [];
+  }
+
+  const attachments: ChatAttachment[] = [];
+  for (const entry of published) {
+    const record = asRecord(entry);
+    const id = asString(record?.id)?.trim();
+    const name = asString(record?.name)?.trim();
+    const mimeType = asString(record?.mimeType)?.trim().toLowerCase();
+    const sizeBytes =
+      typeof record?.sizeBytes === "number" &&
+      Number.isInteger(record.sizeBytes) &&
+      record.sizeBytes >= 0
+        ? record.sizeBytes
+        : undefined;
+    if (!id || !name || !mimeType?.startsWith("image/") || sizeBytes === undefined) {
+      continue;
+    }
+    attachments.push({
+      type: "image",
+      id,
+      name,
+      mimeType,
+      sizeBytes,
+    });
+  }
+  return attachments;
+}
+
+function extractPublishedAssistantAttachments(
+  event: ProviderRuntimeEvent,
+): ReadonlyArray<ChatAttachment> {
+  if (event.type !== "item.completed" || event.payload.itemType !== "mcp_tool_call") {
+    return [];
+  }
+
+  const payload = runtimePayloadRecord(event);
+  if (extractPublishToolName(payload) !== PUBLISH_IMAGES_TO_CHAT_TOOL_NAME) {
+    return [];
+  }
+
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  const result = asRecord(item?.result) ?? asRecord(data?.result);
+  const directStructuredContent =
+    asRecord(result?.structuredContent) ?? asRecord(result?.structured_content);
+  const directPublished = parsePublishedAttachments(directStructuredContent);
+  if (directPublished.length > 0) {
+    return directPublished;
+  }
+
+  const content = asArray(result?.content);
+  if (!content) {
+    return [];
+  }
+
+  for (const entry of content) {
+    const record = asRecord(entry);
+    if (!record) {
+      continue;
+    }
+    const text = asString(record.text);
+    if (!text) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      const published = parsePublishedAttachments(parsed);
+      if (published.length > 0) {
+        return published;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return [];
 }
 
 function runtimePayloadRecord(event: ProviderRuntimeEvent): Record<string, unknown> | undefined {
@@ -507,6 +614,12 @@ const make = Effect.gen(function* () {
     lookup: () => Effect.succeed({ text: "", createdAt: "" }),
   });
 
+  const bufferedAssistantAttachmentsByTurnKey = yield* Cache.make<string, ChatAttachment[]>({
+    capacity: BUFFERED_ASSISTANT_ATTACHMENTS_BY_TURN_CACHE_CAPACITY,
+    timeToLive: BUFFERED_ASSISTANT_ATTACHMENTS_BY_TURN_TTL,
+    lookup: () => Effect.succeed([]),
+  });
+
   const isGitRepoForThread = Effect.fnUntraced(function* (threadId: ThreadId) {
     const readModel = yield* orchestrationEngine.getReadModel();
     const thread = readModel.threads.find((entry) => entry.id === threadId);
@@ -624,6 +737,39 @@ const make = Effect.gen(function* () {
   const clearBufferedProposedPlan = (planId: string) =>
     Cache.invalidate(bufferedProposedPlanById, planId);
 
+  const appendBufferedAssistantAttachments = (
+    threadId: ThreadId,
+    turnId: TurnId,
+    attachments: ReadonlyArray<ChatAttachment>,
+  ) =>
+    Cache.getOption(bufferedAssistantAttachmentsByTurnKey, providerTurnKey(threadId, turnId)).pipe(
+      Effect.flatMap((existingAttachments) => {
+        const deduped = new Map<string, ChatAttachment>();
+        for (const attachment of Option.getOrElse(existingAttachments, () => [])) {
+          deduped.set(attachment.id, attachment);
+        }
+        for (const attachment of attachments) {
+          deduped.set(attachment.id, attachment);
+        }
+        return Cache.set(bufferedAssistantAttachmentsByTurnKey, providerTurnKey(threadId, turnId), [
+          ...deduped.values(),
+        ]);
+      }),
+    );
+
+  const takeBufferedAssistantAttachments = (threadId: ThreadId, turnId: TurnId) =>
+    Cache.getOption(bufferedAssistantAttachmentsByTurnKey, providerTurnKey(threadId, turnId)).pipe(
+      Effect.flatMap((existingAttachments) =>
+        Cache.invalidate(
+          bufferedAssistantAttachmentsByTurnKey,
+          providerTurnKey(threadId, turnId),
+        ).pipe(Effect.as(Option.getOrElse(existingAttachments, (): ChatAttachment[] => []))),
+      ),
+    );
+
+  const clearBufferedAssistantAttachments = (threadId: ThreadId, turnId: TurnId) =>
+    Cache.invalidate(bufferedAssistantAttachmentsByTurnKey, providerTurnKey(threadId, turnId));
+
   const clearAssistantMessageState = (messageId: MessageId) =>
     clearBufferedAssistantText(messageId);
 
@@ -632,6 +778,7 @@ const make = Effect.gen(function* () {
     threadId: ThreadId;
     messageId: MessageId;
     turnId?: TurnId;
+    attachments?: ReadonlyArray<ChatAttachment>;
     createdAt: string;
     commandTag: string;
     finalDeltaCommandTag: string;
@@ -663,6 +810,9 @@ const make = Effect.gen(function* () {
         commandId: providerCommandId(input.event, input.commandTag),
         threadId: input.threadId,
         messageId: input.messageId,
+        ...(input.attachments && input.attachments.length > 0
+          ? { attachments: [...input.attachments] }
+          : {}),
         ...(input.turnId ? { turnId: input.turnId } : {}),
         createdAt: input.createdAt,
       });
@@ -1027,6 +1177,26 @@ const make = Effect.gen(function* () {
         yield* appendBufferedProposedPlan(planId, proposedPlanDelta, now);
       }
 
+      const publishedAssistantAttachments = extractPublishedAssistantAttachments(event);
+      if (publishedAssistantAttachments.length > 0) {
+        const turnId = toTurnId(event.turnId);
+        if (turnId) {
+          yield* appendBufferedAssistantAttachments(
+            thread.id,
+            turnId,
+            publishedAssistantAttachments,
+          );
+        } else {
+          yield* Effect.logWarning(
+            "provider runtime ingestion ignored published chat images without a turn id",
+            {
+              eventId: event.eventId,
+              threadId: thread.id,
+            },
+          );
+        }
+      }
+
       const assistantCompletion =
         event.type === "item.completed" && event.payload.itemType === "assistant_message"
           ? {
@@ -1057,10 +1227,15 @@ const make = Effect.gen(function* () {
           yield* rememberAssistantMessageId(thread.id, turnId, assistantMessageId);
         }
 
+        const assistantAttachments = turnId
+          ? yield* takeBufferedAssistantAttachments(thread.id, turnId)
+          : [];
+
         yield* finalizeAssistantMessage({
           event,
           threadId: thread.id,
           messageId: assistantMessageId,
+          ...(assistantAttachments.length > 0 ? { attachments: assistantAttachments } : {}),
           ...(turnId ? { turnId } : {}),
           createdAt: now,
           commandTag: "assistant-complete",
@@ -1091,13 +1266,18 @@ const make = Effect.gen(function* () {
         const turnId = toTurnId(event.turnId);
         if (turnId) {
           const assistantMessageIds = yield* getAssistantMessageIdsForTurn(thread.id, turnId);
+          const assistantAttachments = yield* takeBufferedAssistantAttachments(thread.id, turnId);
           yield* Effect.forEach(
-            assistantMessageIds,
-            (assistantMessageId) =>
+            [...assistantMessageIds].map((assistantMessageId, index) => ({
+              assistantMessageId,
+              attachments: index === 0 ? assistantAttachments : [],
+            })),
+            ({ assistantMessageId, attachments }) =>
               finalizeAssistantMessage({
                 event,
                 threadId: thread.id,
                 messageId: assistantMessageId,
+                ...(attachments.length > 0 ? { attachments } : {}),
                 turnId,
                 createdAt: now,
                 commandTag: "assistant-complete-finalize",
@@ -1120,6 +1300,12 @@ const make = Effect.gen(function* () {
 
       if (event.type === "session.exited") {
         yield* clearTurnStateForSession(thread.id);
+        const exitedTurnId = toTurnId(event.turnId);
+        if (exitedTurnId) {
+          yield* clearBufferedAssistantAttachments(thread.id, exitedTurnId);
+        } else if (activeTurnId) {
+          yield* clearBufferedAssistantAttachments(thread.id, activeTurnId);
+        }
       }
 
       if (event.type === "runtime.error") {

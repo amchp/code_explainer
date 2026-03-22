@@ -58,7 +58,7 @@ import { ProviderHealth } from "./provider/Services/ProviderHealth";
 import { clamp } from "effect/Number";
 import { Open, resolveAvailableEditors } from "./open";
 import { ServerConfig } from "./config";
-import { isDrawioMcpEnabled, setDrawioMcpEnabled } from "./codexMcpConfig";
+import { setDiagramToolMcpEnabled } from "./codexMcpConfig";
 import { GitCore } from "./git/Services/GitCore.ts";
 import { tryHandleProjectFaviconRequest } from "./projectFaviconRoute";
 import {
@@ -67,11 +67,8 @@ import {
   resolveAttachmentRelativePath,
 } from "./attachmentPaths";
 
-import {
-  createAttachmentId,
-  resolveAttachmentPath,
-  resolveAttachmentPathById,
-} from "./attachmentStore.ts";
+import { resolveAttachmentPathById } from "./attachmentStore.ts";
+import { persistChatImageAttachment } from "./chatImageAttachments.ts";
 import { parseBase64DataUrl } from "./imageMime.ts";
 import { AnalyticsService } from "./telemetry/Services/AnalyticsService.ts";
 import { expandHomePath } from "./os-jank.ts";
@@ -352,50 +349,20 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
               message: `Image attachment '${attachment.name}' is empty or too large.`,
             });
           }
-
-          const attachmentId = createAttachmentId(turnStartCommand.threadId);
-          if (!attachmentId) {
-            return yield* new RouteRequestError({
-              message: "Failed to create a safe attachment id.",
-            });
-          }
-
-          const persistedAttachment = {
-            type: "image" as const,
-            id: attachmentId,
-            name: attachment.name,
-            mimeType: parsed.mimeType.toLowerCase(),
-            sizeBytes: bytes.byteLength,
-          };
-
-          const attachmentPath = resolveAttachmentPath({
+          return yield* persistChatImageAttachment({
+            threadId: turnStartCommand.threadId,
             stateDir: serverConfig.stateDir,
-            attachment: persistedAttachment,
-          });
-          if (!attachmentPath) {
-            return yield* new RouteRequestError({
-              message: `Failed to resolve persisted path for '${attachment.name}'.`,
-            });
-          }
-
-          yield* fileSystem.makeDirectory(path.dirname(attachmentPath), { recursive: true }).pipe(
+            name: attachment.name,
+            mimeType: parsed.mimeType,
+            bytes,
+          }).pipe(
             Effect.mapError(
-              () =>
+              (error) =>
                 new RouteRequestError({
-                  message: `Failed to create attachment directory for '${attachment.name}'.`,
+                  message: error.message,
                 }),
             ),
           );
-          yield* fileSystem.writeFile(attachmentPath, bytes).pipe(
-            Effect.mapError(
-              () =>
-                new RouteRequestError({
-                  message: `Failed to persist attachment '${attachment.name}'.`,
-                }),
-            ),
-          );
-
-          return persistedAttachment;
         }),
       { concurrency: 1 },
     );
@@ -856,10 +823,10 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
         return { keybindings: keybindingsConfig, issues: [] };
       }
 
-      case WS_METHODS.serverSetDrawioMcpEnabled: {
+      case WS_METHODS.serverSetDiagramToolMcpEnabled: {
         const body = stripRequestTag(request.body);
-        const enabled = setDrawioMcpEnabled(body.enabled);
-        return { enabled };
+        const enabled = setDiagramToolMcpEnabled(body.integration, body.enabled);
+        return { integration: body.integration, enabled };
       }
 
       default: {

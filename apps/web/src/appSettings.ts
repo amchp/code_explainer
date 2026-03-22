@@ -33,6 +33,12 @@ const AppSettingsSchema = Schema.Struct({
   ),
   textGenerationModel: Schema.optional(TrimmedNonEmptyString),
   drawioMcpEnabled: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
+  mermaidMcpEnabled: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
+  plantumlMcpEnabled: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
+  graphvizMcpEnabled: Schema.Boolean.pipe(Schema.withConstructorDefault(() => Option.some(false))),
+  excalidrawMcpEnabled: Schema.Boolean.pipe(
+    Schema.withConstructorDefault(() => Option.some(false)),
+  ),
 });
 export type AppSettings = typeof AppSettingsSchema.Type;
 export interface AppModelOption {

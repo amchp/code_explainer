@@ -14,6 +14,21 @@ export const IMAGE_EXTENSION_BY_MIME_TYPE: Record<string, string> = {
   "image/webp": ".webp",
 };
 
+export const IMAGE_MIME_TYPE_BY_EXTENSION: Record<string, string> = {
+  ".avif": "image/avif",
+  ".bmp": "image/bmp",
+  ".gif": "image/gif",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".tiff": "image/tiff",
+  ".webp": "image/webp",
+};
+
 export const SAFE_IMAGE_FILE_EXTENSIONS = new Set([
   ".avif",
   ".bmp",
@@ -76,4 +91,14 @@ export function inferImageExtension(input: { mimeType: string; fileName?: string
   }
 
   return ".bin";
+}
+
+export function inferImageMimeTypeFromPath(filePath: string): string | null {
+  const normalized = filePath.trim().toLowerCase();
+  const extensionMatch = /\.([a-z0-9]{1,8})$/i.exec(normalized);
+  const extension = extensionMatch ? `.${extensionMatch[1]!.toLowerCase()}` : "";
+  const mimeType = Object.hasOwn(IMAGE_MIME_TYPE_BY_EXTENSION, extension)
+    ? IMAGE_MIME_TYPE_BY_EXTENSION[extension]
+    : undefined;
+  return mimeType ?? null;
 }

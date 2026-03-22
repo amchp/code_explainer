@@ -1302,6 +1302,7 @@ const makeCodexAdapter = (options?: CodexAdapterLiveOptions) =>
         threadId: input.threadId,
         provider: "codex",
         ...(input.cwd !== undefined ? { cwd: input.cwd } : {}),
+        stateDir: serverConfig.stateDir,
         ...(input.resumeCursor !== undefined ? { resumeCursor: input.resumeCursor } : {}),
         ...(input.providerOptions !== undefined ? { providerOptions: input.providerOptions } : {}),
         runtimeMode: input.runtimeMode,
@@ -1367,6 +1368,9 @@ const makeCodexAdapter = (options?: CodexAdapterLiveOptions) =>
                 ? { effort: input.modelOptions.codex.reasoningEffort }
                 : {}),
               ...(input.modelOptions?.codex?.fastMode ? { serviceTier: "fast" } : {}),
+              ...(input.diagramProvider !== undefined
+                ? { diagramProvider: input.diagramProvider }
+                : {}),
               ...(input.interactionMode !== undefined
                 ? { interactionMode: input.interactionMode }
                 : {}),

@@ -344,41 +344,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div className="flex justify-end">
               <div className="group relative max-w-[80%] rounded-2xl rounded-br-sm border border-border bg-secondary px-4 py-3">
                 {userImages.length > 0 && (
-                  <div className="mb-2 grid max-w-[420px] grid-cols-2 gap-2">
-                    {userImages.map(
-                      (image: NonNullable<TimelineMessage["attachments"]>[number]) => (
-                        <div
-                          key={image.id}
-                          className="overflow-hidden rounded-lg border border-border/80 bg-background/70"
-                        >
-                          {image.previewUrl ? (
-                            <button
-                              type="button"
-                              className="h-full w-full cursor-zoom-in"
-                              aria-label={`Preview ${image.name}`}
-                              onClick={() => {
-                                const preview = buildExpandedImagePreview(userImages, image.id);
-                                if (!preview) return;
-                                onImageExpand(preview);
-                              }}
-                            >
-                              <img
-                                src={image.previewUrl}
-                                alt={image.name}
-                                className="h-full max-h-[220px] w-full object-cover"
-                                onLoad={onTimelineImageLoad}
-                                onError={onTimelineImageLoad}
-                              />
-                            </button>
-                          ) : (
-                            <div className="flex min-h-[72px] items-center justify-center px-2 py-3 text-center text-[11px] text-muted-foreground/70">
-                              {image.name}
-                            </div>
-                          )}
-                        </div>
-                      ),
-                    )}
-                  </div>
+                  <MessageImageAttachments
+                    attachments={userImages}
+                    onImageExpand={onImageExpand}
+                    onTimelineImageLoad={onTimelineImageLoad}
+                    className="mb-2"
+                  />
                 )}
                 {(displayedUserMessage.visibleText.trim().length > 0 ||
                   terminalContexts.length > 0) && (
@@ -417,7 +388,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       {row.kind === "message" &&
         row.message.role === "assistant" &&
         (() => {
-          const messageText = row.message.text || (row.message.streaming ? "" : "(empty response)");
+          const hasAttachments = (row.message.attachments?.length ?? 0) > 0;
+          const messageText =
+            row.message.text || (row.message.streaming || hasAttachments ? "" : "(empty response)");
           return (
             <>
               {row.showCompletionDivider && (
@@ -430,11 +403,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 </div>
               )}
               <div className="min-w-0 px-1 py-0.5">
-                <ChatMarkdown
-                  text={messageText}
-                  cwd={markdownCwd}
-                  isStreaming={Boolean(row.message.streaming)}
-                />
+                {hasAttachments && (
+                  <MessageImageAttachments
+                    attachments={row.message.attachments ?? []}
+                    onImageExpand={onImageExpand}
+                    onTimelineImageLoad={onTimelineImageLoad}
+                    className="mb-3"
+                  />
+                )}
+                {messageText.length > 0 && (
+                  <ChatMarkdown
+                    text={messageText}
+                    cwd={markdownCwd}
+                    isStreaming={Boolean(row.message.streaming)}
+                  />
+                )}
                 <p className="mt-1.5 text-[10px] text-muted-foreground/30">
                   {formatMessageMeta(
                     row.message.createdAt,
@@ -832,6 +815,57 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
           )}
         </div>
       )}
+    </div>
+  );
+});
+
+const MessageImageAttachments = memo(function MessageImageAttachments(props: {
+  attachments: ReadonlyArray<NonNullable<TimelineMessage["attachments"]>[number]>;
+  onImageExpand: (preview: ExpandedImagePreview) => void;
+  onTimelineImageLoad: () => void;
+  className?: string;
+}) {
+  const previewableAttachments = props.attachments.filter(
+    (
+      attachment,
+    ): attachment is NonNullable<TimelineMessage["attachments"]>[number] & {
+      previewUrl: string;
+    } => typeof attachment.previewUrl === "string" && attachment.previewUrl.length > 0,
+  );
+
+  return (
+    <div className={cn("grid max-w-[420px] grid-cols-2 gap-2", props.className)}>
+      {props.attachments.map((image) => (
+        <div
+          key={image.id}
+          className="overflow-hidden rounded-lg border border-border/80 bg-background/70"
+        >
+          {image.previewUrl ? (
+            <button
+              type="button"
+              className="h-full w-full cursor-zoom-in"
+              aria-label={`Preview ${image.name}`}
+              onClick={() => {
+                const preview = buildExpandedImagePreview(previewableAttachments, image.id);
+                if (!preview) return;
+                props.onImageExpand(preview);
+              }}
+            >
+              <img
+                src={image.previewUrl}
+                alt={image.name}
+                className="h-full max-h-[220px] w-full object-cover"
+                onLoad={props.onTimelineImageLoad}
+                onError={props.onTimelineImageLoad}
+              />
+            </button>
+          ) : (
+            <div className="flex min-h-[72px] items-center justify-center px-2 py-3 text-center text-[11px] text-muted-foreground/70">
+              {image.name}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 });

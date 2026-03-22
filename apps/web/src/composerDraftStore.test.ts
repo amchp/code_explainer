@@ -523,6 +523,37 @@ describe("composerDraftStore setModel", () => {
   });
 });
 
+describe("composerDraftStore setDiagramProvider", () => {
+  const threadId = ThreadId.makeUnsafe("thread-diagram-provider");
+
+  beforeEach(() => {
+    useComposerDraftStore.setState({
+      draftsByThreadId: {},
+      draftThreadsByThreadId: {},
+      projectDraftThreadIdByProjectId: {},
+    });
+  });
+
+  it("persists diagram-provider-only selection even when prompt/model are empty", () => {
+    const store = useComposerDraftStore.getState();
+
+    store.setDiagramProvider(threadId, "drawio");
+
+    expect(useComposerDraftStore.getState().draftsByThreadId[threadId]?.diagramProvider).toBe(
+      "drawio",
+    );
+  });
+
+  it("removes empty diagram-provider-only draft when provider is reset", () => {
+    const store = useComposerDraftStore.getState();
+
+    store.setDiagramProvider(threadId, "drawio");
+    store.setDiagramProvider(threadId, null);
+
+    expect(useComposerDraftStore.getState().draftsByThreadId[threadId]).toBeUndefined();
+  });
+});
+
 describe("composerDraftStore setProvider", () => {
   const threadId = ThreadId.makeUnsafe("thread-provider");
 
